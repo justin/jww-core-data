@@ -1,5 +1,5 @@
 import XCTest
-@testable import Package
+@testable import JWWCoreData
 
 /// Tests to validate the `Person` type.
 final class PersonTests: XCTestCase {
