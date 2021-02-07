@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "Package",
+    name: "JWW Core Data",
     platforms: [
         .iOS(.v14),
         .macOS(.v11),
@@ -14,10 +14,12 @@ let package = Package(
         .library(name: "JWW Core Data", targets: ["JWWCoreData"]),
     ],
     targets: [
-        .target(name: "JWWCoreData"),
+        .target( name: "JWWCoreData"),
         .testTarget(name: "JWWCoreDataTests",
-                    dependencies: [
-                        "JWWCoreData"
-                    ])
+                    dependencies: ["JWWCoreData"],
+                    resources: [
+                        .process("Resources")
+                    ]
+        )
     ]
 )
