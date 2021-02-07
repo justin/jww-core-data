@@ -1,6 +1,10 @@
-# JWW Swift Package Template
+# JWW Core Data
 
-A template repository with the default configuration values for a new Swift Package.
+Shared pieces of Core Data code I use in different projects.
+
+## Contents
+
+* **JWWPersistentContainer**: A subclass of `NSPersistentContainer` with a set of frequently used overrides and additional methods I use in my projects.
 
 ## License
 
