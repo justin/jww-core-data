@@ -7,14 +7,17 @@ let package = Package(
     platforms: [
         .iOS(.v14),
         .macOS(.v11),
-        .tvOS(.v14)
+        .tvOS(.v14),
+        .watchOS(.v7)
     ],
     products: [
-        .library(name: "Package", targets: ["Package"]),
+        .library(name: "JWW Core Data", targets: ["JWWCoreData"]),
     ],
-    dependencies: [],
     targets: [
-        .target( name: "Package"),
-        .testTarget(name: "PackageTests", dependencies: ["Package"])
+        .target(name: "JWWCoreData"),
+        .testTarget(name: "JWWCoreDataTests",
+                    dependencies: [
+                        "JWWCoreData"
+                    ])
     ]
 )
