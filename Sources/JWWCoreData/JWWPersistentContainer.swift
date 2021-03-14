@@ -88,25 +88,37 @@ open class JWWPersistentContainer: NSPersistentContainer {
     // Public Methods
     // ====================================
 
+    @discardableResult
+    public func performBackgroundTask(andSave shouldSave: Bool, closure: @escaping (NSManagedObjectContext) -> Void) -> Future<Void, Error> {
+        return Future { promise in
+            self.performBackgroundTask { context in
+                closure(context)
 
-    /// Returns a publisher that wraps the `loadPersistentStores(completionHandler:)` function.
-    ///
-    /// - Returns: An `AnyPublisher` wrapping this publisher.
-    public func loadPersistentStores() -> AnyPublisher<NSPersistentStoreDescription, Error> {
+                guard shouldSave else {
+                    promise(.success(()))
+                    return
+                }
+
+                do {
+                    promise(.success(try context.save()))
+                } catch let error as NSError {
+                    context.rollback()
+                    self.log.error("Error inserting default assets \(error.userInfo)")
+                    promise(.failure(error))
+                }
+
+            }
+        }
+    }
+
+    public func load(store: NSPersistentStoreDescription) -> AnyPublisher<NSPersistentStoreDescription, Error> {
         Future { [self] promise in
-            let count = persistentStoreDescriptions.count
-            var index = 0
-
-            loadPersistentStores { (description, error) in
+            persistentStoreCoordinator.addPersistentStore(with: store) { (desc, error) in
                 if let error = error {
                     return promise(.failure(error))
                 }
 
-                index += 1
-
-                if index == count {
-                    return promise(.success(description))
-                }
+                return promise(.success((store)))
             }
         }.eraseToAnyPublisher()
     }
