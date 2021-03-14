@@ -38,6 +38,7 @@ open class JWWPersistentContainer: NSPersistentContainer {
     }
 
     private let log = Logger(category: .database)
+    private var saveNotificationSubscriber: AnyCancellable?
 
     // MARK: Initialization
     // ====================================
@@ -58,6 +59,8 @@ open class JWWPersistentContainer: NSPersistentContainer {
         }
 
         super.init(name: name, managedObjectModel: model)
+
+        configureSaveNotifications()
     }
 
     // MARK: Subclass Methods
@@ -66,10 +69,11 @@ open class JWWPersistentContainer: NSPersistentContainer {
     // ====================================
 
     public override func loadPersistentStores(completionHandler block: @escaping (NSPersistentStoreDescription, Error?) -> Void) {
-        let completion = {(storeDescription: NSPersistentStoreDescription, error: Error?) -> Void in
-            self.viewContext.name = "UI / Main thread context"
-            self.viewContext.automaticallyMergesChangesFromParent = true
-            self.viewContext.mergePolicy = NSMergePolicy(merge: .mergeByPropertyObjectTrumpMergePolicyType)
+        let completion = { [self] (storeDescription: NSPersistentStoreDescription, error: Error?) -> Void in
+            viewContext.name = "UI / Main thread context"
+            viewContext.automaticallyMergesChangesFromParent = true
+            viewContext.shouldDeleteInaccessibleFaults = true
+            viewContext.mergePolicy = NSMergePolicy(merge: .mergeByPropertyObjectTrumpMergePolicyType)
             block(storeDescription, error)
         }
         super.loadPersistentStores(completionHandler: completion)
@@ -139,4 +143,30 @@ open class JWWPersistentContainer: NSPersistentContainer {
             })
             .eraseToAnyPublisher()
     }
+
+    // MARK: Private / Convenience
+    // ====================================
+    // Private / Convenience
+    // ====================================
+
+    /// Listen for changes on background contexts and merge them into the main context.
+    private func configureSaveNotifications() {
+        saveNotificationSubscriber = NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)
+            .receive(on: DispatchQueue.main)
+            .sink { [self] (notification) in
+                guard let notificationContext = notification.object as? NSManagedObjectContext else {
+                    assertionFailure("Unexpected object passed through context notification.")
+                    return
+                }
+
+                guard notificationContext !== viewContext else {
+                    return
+                }
+
+                viewContext.perform {
+                    viewContext.mergeChanges(fromContextDidSave: notification)
+                }
+            }
+    }
+
 }
