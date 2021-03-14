@@ -1,19 +1,53 @@
 import Foundation
 import Combine
 import CoreData
+import JWWCore
+import os
 
 /// A container that encapsulates the Core Data stack in your app.
 open class JWWPersistentContainer: NSPersistentContainer {
+    /// The current loading state of the persistent stores managed by the container.
+    @Published public private(set) var state: State = .inactive
+
     /// The main thread / UI managed object context.
     public var mainObjectContext: NSManagedObjectContext {
         viewContext
     }
+
+    /// The potential states the persistent container can be in.
+    public enum State: Equatable {
+        /// The container has not loaded its stores.
+        case inactive
+
+        /// The persistent stores have been loaded.
+        case loaded
+
+        /// Loading persistent stores failed with an error.
+        case failed(Error)
+
+        public static func == (lhs: JWWPersistentContainer.State, rhs: JWWPersistentContainer.State) -> Bool {
+            switch (lhs, rhs) {
+            case (.inactive, .inactive),
+                 (.loaded, .loaded),
+                 (.failed, .failed):
+                return true
+            default:
+                return false
+            }
+        }
+    }
+
+    private let log = Logger(category: .database)
 
     // MARK: Initialization
     // ====================================
     // Initialization
     // ====================================
 
+    /// Initializes a persistent container with the given name and model.
+    /// - Parameters:
+    ///   - name: The name used by the persistent container
+    ///   - bundle: The bundle to search for the managed object model.
     public init(name: String, bundle: Bundle) {
         guard let url = bundle.url(forResource: name, withExtension: "momd") else {
             fatalError("Failed to find model \(name) in bundle.")
@@ -75,5 +109,22 @@ open class JWWPersistentContainer: NSPersistentContainer {
                 }
             }
         }.eraseToAnyPublisher()
+    }
+
+    /// Returns a publisher that wraps the `loadPersistentStores(completionHandler:)` function.
+    ///
+    /// - Returns: An `AnyPublisher` wrapping this publisher.
+    public func loadPersistentStores() -> AnyPublisher<[NSPersistentStoreDescription], Error> {
+        Publishers.MergeMany(persistentStoreDescriptions.map(load(store:)))
+            .collect()
+            .handleEvents(receiveCompletion: { completion in
+                switch completion {
+                case .failure(let error):
+                    self.state = .failed(error)
+                case .finished:
+                    self.state = .loaded
+                }
+            })
+            .eraseToAnyPublisher()
     }
 }

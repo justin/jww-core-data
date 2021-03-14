@@ -1,0 +1,16 @@
+{
+  "object": {
+    "pins": [
+      {
+        "package": "JWWCore",
+        "repositoryURL": "git@github.com:justin/jww-standard-lib.git",
+        "state": {
+          "branch": null,
+          "revision": "5b3db08c86b3a020ff49f827f2eb30098b0c86b6",
+          "version": "1.0.3"
+        }
+      }
+    ]
+  },
+  "version": 1
+}
