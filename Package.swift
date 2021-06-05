@@ -1,4 +1,4 @@
-// swift-tools-version:5.3
+// swift-tools-version:5.4
 
 import PackageDescription
 
@@ -11,16 +11,16 @@ let package = Package(
         .watchOS(.v7)
     ],
     products: [
-        .library(name: "JWW Core Data", targets: ["JWWCoreData"]),
+        .library(name: "JWW Core Data", targets: ["JWWCoreData"])
     ],
     dependencies: [
         .package(name: "JWWCore", url: "git@github.com:justin/jww-standard-lib.git", from: "1.0.3")
     ],
     targets: [
-        .target( name: "JWWCoreData",
-                 dependencies: [
+        .target(name: "JWWCoreData",
+                dependencies: [
                     "JWWCore"
-                 ]),
+                ]),
         .testTarget(name: "JWWCoreDataTests",
                     dependencies: ["JWWCoreData"],
                     resources: [
