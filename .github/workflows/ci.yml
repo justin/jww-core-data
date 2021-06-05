@@ -7,18 +7,50 @@ on:
     branches: [ main ]
 
 jobs:
-  macos:
-    name: "Unit Tests"
-    runs-on: macos-latest
+  lint: 
+    name: Linting
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Ensure Xcode Version
-        run: | 
-          sudo xcode-select -s /Applications/Xcode_12.4.app/Contents/Developer
+      - name: SwiftLint
+        uses: norio-nomura/action-swiftlint@3.2.1
 
-      - name: Build and Test
+  test:
+    name: Build and Test.
+    runs-on: macos-11
+    env:
+      DEVELOPER_DIR: '/Applications/Xcode_12.5.app/Contents/Developer'
+      XCODE_SCHEME: "JWW Core Data"
+
+    steps:
+      - name: "Set up SSH agent"
+        uses: webfactory/ssh-agent@v0.5.2
+        with:
+          ssh-private-key: ${{ secrets.CI_SSH_PRIVATE_KEY }}
+
+      - name: "Add GitHub to the SSH known hosts file"
         run: |
-          swift build; swift test --parallel -Xswiftc -DDEBUG
+          for ip in $(dig @8.8.8.8 github.com +short); do \
+            ssh-keyscan github.com,$ip; \
+            ssh-keyscan $ip; \
+          done 2>/dev/null >> ~/.ssh/known_hosts
 
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Build and Test (macOS)
+        run: | 
+          set -o pipefail && env NSUnbufferedIO=YES 
+          xcodebuild build-for-testing -usePackageSupportBuiltinSCM -scheme "$XCODE_SCHEME" -destination "platform=macOS" | xcpretty
+
+      - name: Build and Test (iOS)
+        run: | 
+          set -o pipefail && env NSUnbufferedIO=YES 
+          xcodebuild build-for-testing -usePackageSupportBuiltinSCM -scheme "$XCODE_SCHEME" -destination "platform=iOS Simulator,OS=latest,name=iPhone 12" | xcpretty
+
+      - name: Build and Test (tvOS)
+        run: | 
+          set -o pipefail && env NSUnbufferedIO=YES 
+          xcodebuild build-for-testing -usePackageSupportBuiltinSCM -scheme "$XCODE_SCHEME" -destination "platform=tvOS Simulator,OS=latest,name=Apple TV 4K" | xcpretty
