@@ -68,7 +68,7 @@ open class JWWPersistentContainer: NSPersistentContainer {
     // Subclass Methods
     // ====================================
 
-    public override func loadPersistentStores(completionHandler block: @escaping (NSPersistentStoreDescription, Error?) -> Void) {
+    open override func loadPersistentStores(completionHandler block: @escaping (NSPersistentStoreDescription, Error?) -> Void) {
         let completion = { [self] (storeDescription: NSPersistentStoreDescription, error: Error?) -> Void in
             viewContext.name = "UI / Main thread context"
             viewContext.automaticallyMergesChangesFromParent = true
@@ -79,7 +79,7 @@ open class JWWPersistentContainer: NSPersistentContainer {
         super.loadPersistentStores(completionHandler: completion)
     }
 
-    public override func newBackgroundContext() -> NSManagedObjectContext {
+    open override func newBackgroundContext() -> NSManagedObjectContext {
         let context = super.newBackgroundContext()
         context.undoManager = nil
         context.name = "Persistent Container Background Context"
