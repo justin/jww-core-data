@@ -9,6 +9,17 @@ open class JWWPersistentContainer: NSPersistentContainer {
     /// The current loading state of the persistent stores managed by the container.
     @Published public private(set) var state: State = .inactive
 
+    /// Publisher that fires when the persistent container has loaded its attached stores.
+    public private(set) lazy var isLoadedPublisher: AnyPublisher<Void, Never> = {
+        $state
+            .drop(while: { state in
+                state != .loaded
+            })
+            .map({ _ in () })
+            .share()
+            .eraseToAnyPublisher()
+    }()
+
     /// The main thread / UI managed object context.
     public var mainObjectContext: NSManagedObjectContext {
         viewContext
@@ -39,6 +50,7 @@ open class JWWPersistentContainer: NSPersistentContainer {
 
     private let log = Logger(category: .database)
     private var saveNotificationSubscriber: AnyCancellable?
+    private var persistentStoreLoadingSubscriber: AnyCancellable?
 
     // MARK: Initialization
     // ====================================
@@ -61,6 +73,14 @@ open class JWWPersistentContainer: NSPersistentContainer {
         super.init(name: name, managedObjectModel: model)
 
         configureSaveNotifications()
+        persistentStoreLoadingSubscriber = isLoadedPublisher
+            .receive(on: RunLoop.main)
+            .sink(receiveValue: { [self] _ in
+                viewContext.name = "UI / Main thread context"
+                viewContext.automaticallyMergesChangesFromParent = true
+                viewContext.shouldDeleteInaccessibleFaults = true
+                viewContext.mergePolicy = NSMergePolicy(merge: .mergeByPropertyObjectTrumpMergePolicyType)
+            })
     }
 
     // MARK: Subclass Methods
@@ -93,12 +113,17 @@ open class JWWPersistentContainer: NSPersistentContainer {
     // ====================================
 
     @discardableResult
-    public func performBackgroundTask(andSave shouldSave: Bool, closure: @escaping (NSManagedObjectContext) -> Void) -> Future<Void, Error> {
+    open func performBackgroundTask(andSave shouldSave: Bool,
+                                    transactionAuthor: String? = nil,
+                                    contextName name: String? = nil,
+                                    closure: @escaping (NSManagedObjectContext) -> Void) -> Future<Void, Error> {
         return Future { promise in
             self.performBackgroundTask { context in
+                context.transactionAuthor = transactionAuthor
+                context.name = name
                 closure(context)
 
-                guard shouldSave else {
+                guard shouldSave, context.hasChanges else {
                     promise(.success(()))
                     return
                 }
@@ -110,7 +135,6 @@ open class JWWPersistentContainer: NSPersistentContainer {
                     self.log.error("Error inserting default assets \(error.userInfo)")
                     promise(.failure(error))
                 }
-
             }
         }
     }
@@ -152,7 +176,7 @@ open class JWWPersistentContainer: NSPersistentContainer {
     /// Listen for changes on background contexts and merge them into the main context.
     private func configureSaveNotifications() {
         saveNotificationSubscriber = NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)
-            .receive(on: DispatchQueue.main)
+            .receive(on: RunLoop.main)
             .sink { [self] (notification) in
                 guard let notificationContext = notification.object as? NSManagedObjectContext else {
                     assertionFailure("Unexpected object passed through context notification.")
@@ -168,5 +192,4 @@ open class JWWPersistentContainer: NSPersistentContainer {
                 }
             }
     }
-
 }
