@@ -3,17 +3,17 @@ import Combine
 import CoreData
 @testable import JWWCoreData
 
-/// Tests to validate the `JWWPersistentContainer` type.
-final class JWWPersistentContainerTests: XCTestCase {
+/// Tests to validate the `JWWCloudKitContainer` type.
+final class JWWCloudKitContainerTests: XCTestCase {
     /// Test container
-    private var sut: JWWPersistentContainer!
+    private var sut: JWWCloudKitContainer!
 
     private var subscriptions: Set<AnyCancellable> = []
 
     override func setUpWithError() throws {
         try super.setUpWithError()
 
-        sut = JWWPersistentContainer(name: "Test Database", bundle: .module)
+        sut = JWWCloudKitContainer(name: "Test Database", bundle: .module)
 
         let loadingEx = expectation(description: "loading persistent store")
 

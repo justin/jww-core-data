@@ -5,7 +5,7 @@ import JWWCore
 import os
 
 /// A container that encapsulates the Core Data stack in your app.
-open class JWWPersistentContainer: NSPersistentContainer, JWWPersistentContainerProviding {
+open class JWWCloudKitContainer: NSPersistentCloudKitContainer, JWWPersistentContainerProviding {
     /// The current loading state of the persistent stores managed by the container.
     @Published public private(set) var state: NSPersistentContainer.State = .inactive
 
