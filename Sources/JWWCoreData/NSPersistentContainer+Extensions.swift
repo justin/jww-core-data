@@ -65,7 +65,6 @@ public protocol JWWPersistentContainerProviding {
     ///   - bundle: The bundle to search for the managed object model.
     init(name: String, bundle: Bundle)
 
-
     /// Perform a background task against the loaded persistent container.
     @discardableResult
     func performBackgroundTask(andSave shouldSave: Bool,
@@ -80,6 +79,17 @@ public protocol JWWPersistentContainerProviding {
 
     /// Load a single persistent store.
     func load(store: NSPersistentStoreDescription) -> AnyPublisher<NSPersistentStoreDescription, Error>
+
+    @available(iOS 15.0.0, macOS 12.0.0, tvOS 15.0.0, watchOS 8.0.0, *)
+    func performBackgroundTask<T>(andSave shouldSave: Bool,
+                                  transactionAuthor: String?,
+                                  contextName name: String?,
+                                  block: @escaping (NSManagedObjectContext) throws -> T) async rethrows -> T
+
+
+    @available(iOS 15.0.0, macOS 12.0.0, tvOS 15.0.0, watchOS 8.0.0, *)
+    @discardableResult
+    func loadPersistentStores() async throws -> [NSPersistentStoreDescription]
 }
 
 // MARK: Default Implementations
@@ -89,6 +99,25 @@ public protocol JWWPersistentContainerProviding {
 public extension JWWPersistentContainerProviding where Self:NSPersistentContainer {
     var mainObjectContext: NSManagedObjectContext {
         viewContext
+    }
+
+    @available(iOS 15.0.0, macOS 12.0.0, tvOS 15.0.0, watchOS 8.0.0, *)
+    func performBackgroundTask<T>(andSave shouldSave: Bool,
+                                  transactionAuthor: String? = nil,
+                                  contextName name: String? = nil,
+                                  block: @escaping (NSManagedObjectContext) throws -> T) async rethrows -> T {
+        try await self.performBackgroundTask { context in
+            context.transactionAuthor = transactionAuthor
+            context.name = name
+            let result = try block(context)
+
+            guard shouldSave, context.hasChanges else {
+                return result
+            }
+
+            try context.save()
+            return result
+        }
     }
 
     @discardableResult
@@ -118,6 +147,30 @@ public extension JWWPersistentContainerProviding where Self:NSPersistentContaine
         }
     }
 
+    @available(iOS 15.0.0, macOS 12.0.0, tvOS 15.0.0, watchOS 8.0.0, *)
+    @discardableResult
+    func loadPersistentStores() async throws -> [NSPersistentStoreDescription] {
+        var cancellable: AnyCancellable?
+        var didReceiveValue = false
+
+        return try await withCheckedThrowingContinuation({ continuation in
+            cancellable = loadPersistentStores().sink(receiveCompletion: { completion in
+                switch completion {
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                case .finished:
+                    break
+                }
+            }, receiveValue: { stores in
+                guard !didReceiveValue else { return }
+
+                didReceiveValue = true
+                cancellable?.cancel()
+                continuation.resume(returning: stores)
+            })
+        })
+    }
+
     func load(store: NSPersistentStoreDescription) -> AnyPublisher<NSPersistentStoreDescription, Error> {
         Future { [self] promise in
             persistentStoreCoordinator.addPersistentStore(with: store) { (desc, error) in
@@ -129,5 +182,4 @@ public extension JWWPersistentContainerProviding where Self:NSPersistentContaine
             }
         }.eraseToAnyPublisher()
     }
-
 }
