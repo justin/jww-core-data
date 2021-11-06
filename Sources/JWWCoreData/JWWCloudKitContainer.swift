@@ -78,7 +78,7 @@ open class JWWCloudKitContainer: NSPersistentCloudKitContainer, JWWPersistentCon
     /// - Returns: An `AnyPublisher` wrapping this publisher.
     public func loadPersistentStores() -> AnyPublisher<[NSPersistentStoreDescription], Error> {
         Publishers.MergeMany(persistentStoreDescriptions.map(load(store:)))
-            .collect()
+            .collect() 
             .handleEvents(receiveCompletion: { completion in
                 switch completion {
                 case .failure(let error):

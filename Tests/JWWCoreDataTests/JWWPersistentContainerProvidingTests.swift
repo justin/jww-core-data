@@ -48,6 +48,7 @@ final class JWWPersistentContainerProvidingTests: XCTestCase {
         let loadedStores = try await sut.loadPersistentStores()
 
         XCTAssertEqual(loadedStores.count, 1)
+        XCTAssertEqual(sut.state, .loaded)
     }
 
     /// Validate we can perform a background task that returns a `Publisher`.

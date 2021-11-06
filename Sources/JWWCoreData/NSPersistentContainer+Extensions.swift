@@ -151,7 +151,7 @@ public extension JWWPersistentContainerProviding where Self:NSPersistentContaine
     @discardableResult
     func loadPersistentStores() async throws -> [NSPersistentStoreDescription] {
         var cancellable: AnyCancellable?
-        var didReceiveValue = false
+        var stores: [NSPersistentStoreDescription] = []
 
         return try await withCheckedThrowingContinuation({ continuation in
             cancellable = loadPersistentStores().sink(receiveCompletion: { completion in
@@ -159,14 +159,13 @@ public extension JWWPersistentContainerProviding where Self:NSPersistentContaine
                 case .failure(let error):
                     continuation.resume(throwing: error)
                 case .finished:
-                    break
+                    continuation.resume(returning: stores)
                 }
-            }, receiveValue: { stores in
-                guard !didReceiveValue else { return }
 
-                didReceiveValue = true
                 cancellable?.cancel()
-                continuation.resume(returning: stores)
+            }, receiveValue: { values in
+
+                stores.append(contentsOf: values)
             })
         })
     }
