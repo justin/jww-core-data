@@ -86,7 +86,6 @@ public protocol JWWPersistentContainerProviding {
                                   contextName name: String?,
                                   block: @escaping (NSManagedObjectContext) throws -> T) async rethrows -> T
 
-
     @available(iOS 15.0.0, macOS 12.0.0, tvOS 15.0.0, watchOS 8.0.0, *)
     @discardableResult
     func loadPersistentStores() async throws -> [NSPersistentStoreDescription]
@@ -96,7 +95,7 @@ public protocol JWWPersistentContainerProviding {
 // ====================================
 // Default Implementations
 // ====================================
-public extension JWWPersistentContainerProviding where Self:NSPersistentContainer {
+public extension JWWPersistentContainerProviding where Self: NSPersistentContainer {
     var mainObjectContext: NSManagedObjectContext {
         viewContext
     }
@@ -172,7 +171,7 @@ public extension JWWPersistentContainerProviding where Self:NSPersistentContaine
 
     func load(store: NSPersistentStoreDescription) -> AnyPublisher<NSPersistentStoreDescription, Error> {
         Future { [self] promise in
-            persistentStoreCoordinator.addPersistentStore(with: store) { (desc, error) in
+            persistentStoreCoordinator.addPersistentStore(with: store) { (_, error) in
                 if let error = error {
                     return promise(.failure(error))
                 }

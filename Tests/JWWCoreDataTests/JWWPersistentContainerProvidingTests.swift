@@ -34,7 +34,7 @@ final class JWWPersistentContainerProvidingTests: XCTestCase {
                 case .failure(let error):
                     XCTFail("Error initialized data store: \(error)")
                 }
-            } receiveValue: { store in
+            } receiveValue: { _ in
                 ex.fulfill()
             }
             .store(in: &subscriptions)
