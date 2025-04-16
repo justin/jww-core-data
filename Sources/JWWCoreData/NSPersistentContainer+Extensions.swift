@@ -2,7 +2,6 @@ import Foundation
 import CoreData
 import Combine
 import os
-import JWWCore
 
 public extension NSPersistentContainer {
     /// The supported storage types.
