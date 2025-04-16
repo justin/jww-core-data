@@ -3,6 +3,10 @@ import Combine
 import CoreData
 import JWWCoreData
 
+/// An implementation of `JWWPersistentContainerProviding` that can be used in unit tests.
+///
+/// The model is written to /dev/null, and the persistent store is created in memory so there
+/// are no side effects on the file system.
 final class TestPersistentContainer: NSPersistentContainer, JWWPersistentContainerProviding, @unchecked Sendable {
     /// The current loading state of the persistent stores managed by the container.
     @Published public private(set) var state: NSPersistentContainer.State = .inactive

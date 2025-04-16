@@ -75,7 +75,7 @@ final class JWWPersistentContainerProvidingTests: XCTestCase {
             }
 
             for index in 0..<100 {
-                let person = Person(entity: entity, insertInto: moc)
+                let person = CDPerson(entity: entity, insertInto: moc)
                 person.id = UUID()
                 person.firstName = "FN \(index)"
                 person.lastName = "LN \(index)"
@@ -87,7 +87,7 @@ final class JWWPersistentContainerProvidingTests: XCTestCase {
 
         wait(for: [insertEx], timeout: 1.0)
 
-        let count = try sut.viewContext.count(for: Person.fetchRequest())
+        let count = try sut.viewContext.count(for: CDPerson.sortedFetchRequest)
         XCTAssertEqual(count, 100)
     }
 
@@ -97,13 +97,13 @@ final class JWWPersistentContainerProvidingTests: XCTestCase {
         try await sut.loadPersistentStores()
 
         await sut.performBackgroundTask(andSave: true, contextName: "Unit Test", block: { moc in
-            guard let entity = NSEntityDescription.entity(forEntityName: "Person", in: moc) else {
+            guard let entity = NSEntityDescription.entity(forEntityName: CDPerson.entityName, in: moc) else {
                 XCTFail("Cannot find entity")
                 return
             }
 
             for index in 0..<100 {
-                let person = Person(entity: entity, insertInto: moc)
+                let person = CDPerson(entity: entity, insertInto: moc)
                 person.id = UUID()
                 person.firstName = "FN \(index)"
                 person.lastName = "LN \(index)"
@@ -111,7 +111,8 @@ final class JWWPersistentContainerProvidingTests: XCTestCase {
             }
         })
 
-        let count = try sut.viewContext.count(for: Person.fetchRequest())
+
+        let count = try sut.viewContext.count(for: CDPerson.sortedFetchRequest)
         XCTAssertEqual(count, 100)
     }
 }
