@@ -1,0 +1,7 @@
+{
+  "lldb.launch.expressions": "native",
+  "files.exclude": {
+    "**/.build": true,
+    "**/.swiftpm": true
+  }
+}
