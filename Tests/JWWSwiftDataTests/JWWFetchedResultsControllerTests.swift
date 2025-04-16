@@ -13,7 +13,7 @@ final class JWWFetchedResultsControllerTests {
 
     init() throws {
         container = JWWSwiftDataTestingStack().testingModelContainer
-        sut = JWWFetchedResultsController(fetchRequest: FetchDescriptor<Person>(), context: container.mainContext)
+        sut = JWWFetchedResultsController(fetchRequest: FetchDescriptor<Person>(), container: container)
     }
 
     @Test("init")
@@ -41,7 +41,7 @@ final class JWWFetchedResultsControllerTests {
         #expect(result.count == 3, "Expected 3 people, but got \(result.count)")
     }
 
-    @Test("Fetching data with predicate")
+    @Test("Updating already fetched data")
     func updateData() async throws {
         delegate = JWWFetchedResultsControllerTestsDelegate()
         sut.delegate = delegate
@@ -62,6 +62,9 @@ final class JWWFetchedResultsControllerTests {
         let result = try #require(delegate)
         #expect(result.controllerWillChangeContentCalled == true)
         #expect(result.controllerDidChangeContentCalled == true)
+
+        container.mainContext.insert(Person(id: UUID(), firstName: "Steve"))
+        try container.mainContext.save()
     }
 }
 

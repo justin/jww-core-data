@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import CoreData
 import JWWCore
 import os
 
@@ -17,17 +18,22 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
     public unowned(unsafe) var delegate: (any JWWFetchedResultsControllerDelegate)?
     public private(set) var fetchedModels: [T]?
 
+    private let container: ModelContainer
     private let modelContext: ModelContext
     private let fetchDescriptor: FetchDescriptor<T>
+
+    private let databaseMonitor: JWWDatabaseMonitor
 
     // MARK: Initialization
     // ====================================
     // Initialization
     // ====================================
 
-    public init(fetchRequest: FetchDescriptor<T>, context: ModelContext) {
-        self.modelContext = context
+    public init(fetchRequest: FetchDescriptor<T>, container: ModelContainer) {
+        self.container = container
+        self.modelContext = container.mainContext
         self.fetchDescriptor = fetchRequest
+        self.databaseMonitor = JWWDatabaseMonitor(modelContainer: container)
     }
 
     deinit {
@@ -50,6 +56,22 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
 
         if let delegate {
             delegate.controllerDidChangeContent(self)
+        }
+
+        Task.detached { [databaseMonitor] in
+            await databaseMonitor.subscribeToModelChanges()
+        }
+    }
+}
+
+@available(macOS 14, iOS 17, tvOS 17, watchOS 10, *)
+@ModelActor
+private actor JWWDatabaseMonitor {
+    func subscribeToModelChanges() async {
+        for await _ in NotificationCenter.default.notifications(
+            named: ModelContext.didSave
+        ).map({ _ in () }) {
+            print("Reloading widget timelines because of NSPersistentStoreRemoteChange!")
         }
     }
 }
