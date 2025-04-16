@@ -7,7 +7,7 @@ import os
 /// A container that encapsulates the Core Data stack in your app.
 open class JWWCloudKitContainer: NSPersistentCloudKitContainer, JWWPersistentContainerProviding, @unchecked Sendable {
     /// The current loading state of the persistent stores managed by the container.
-    @Published public private(set) var state: NSPersistentContainer.State = .inactive
+    @Published public var state: NSPersistentContainer.State = .inactive
 
     /// Publisher that fires when the persistent container has loaded its attached stores.
     public private(set) lazy var isLoadedPublisher: AnyPublisher<Void, Never> = {
@@ -20,7 +20,6 @@ open class JWWCloudKitContainer: NSPersistentCloudKitContainer, JWWPersistentCon
             .eraseToAnyPublisher()
     }()
 
-    private let log = Logger(category: .database)
     private var saveNotificationSubscriber: AnyCancellable?
     private var persistentStoreLoadingSubscriber: AnyCancellable?
 

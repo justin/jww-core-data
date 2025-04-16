@@ -2,6 +2,8 @@ import Foundation
 import Combine
 import CoreData
 import JWWCoreData
+import JWWCore
+import os
 
 /// An implementation of `JWWPersistentContainerProviding` that can be used in unit tests.
 ///
@@ -9,7 +11,7 @@ import JWWCoreData
 /// are no side effects on the file system.
 final class TestPersistentContainer: NSPersistentContainer, JWWPersistentContainerProviding, @unchecked Sendable {
     /// The current loading state of the persistent stores managed by the container.
-    @Published public private(set) var state: NSPersistentContainer.State = .inactive
+    @Published public internal(set) var state: NSPersistentContainer.State = .inactive
 
     /// Publisher that fires when the persistent container has loaded its attached stores.
     public private(set) lazy var isLoadedPublisher: AnyPublisher<Void, Never> = {
@@ -52,6 +54,12 @@ final class TestPersistentContainer: NSPersistentContainer, JWWPersistentContain
                 viewContext.shouldDeleteInaccessibleFaults = true
                 viewContext.mergePolicy = NSMergePolicy(merge: .mergeByPropertyObjectTrumpMergePolicyType)
             })
+    }
+
+    deinit {
+        reset()
+        persistentStoreLoadingSubscriber?.cancel()
+        persistentStoreLoadingSubscriber = nil
     }
 
     // MARK: Loading Methods

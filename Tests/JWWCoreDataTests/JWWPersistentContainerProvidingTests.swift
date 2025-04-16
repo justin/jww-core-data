@@ -17,11 +17,13 @@ final class JWWPersistentContainerProvidingTests: XCTestCase {
     override func tearDownWithError() throws {
         try super.tearDownWithError()
 
+        sut.reset()
         subscriptions.removeAll()
         sut = nil
     }
 
     /// Validate we can load an individual persistent store.
+    @MainActor
     func testLoadSingleStorePublisher() throws {
         let store = try XCTUnwrap(sut.persistentStoreDescriptions.first)
 
@@ -45,9 +47,8 @@ final class JWWPersistentContainerProvidingTests: XCTestCase {
     /// Validate we can load all registered persistent stores using Swift concurrency.
     @available(iOS 15.0.0, macOS 12.0.0, tvOS 15.0.0, watchOS 8.0.0, *)
     func testLoadPersistentStoresAsync() async throws {
-        let loadedStores = try await sut.loadPersistentStores()
-
-        XCTAssertEqual(loadedStores.count, 1)
+        let result = try await sut.loadPersistentStores()
+        XCTAssertEqual(result, .loaded)
         XCTAssertEqual(sut.state, .loaded)
     }
 
@@ -82,6 +83,7 @@ final class JWWPersistentContainerProvidingTests: XCTestCase {
                 person.birthDate = Date()
             }
 
+            try? moc.save()
             insertEx.fulfill()
         }
 

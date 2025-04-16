@@ -48,9 +48,9 @@ public extension NSPersistentContainer {
 }
 
 /// Protocol that declares the extensions and custom attributes 
-public protocol JWWPersistentContainerProviding {
+public protocol JWWPersistentContainerProviding: AnyObject {
     /// The current loading state of the persistent stores managed by the container.
-    var state: NSPersistentContainer.State { get }
+    var state: NSPersistentContainer.State { get set }
 
     /// Publisher that fires when the persistent container has loaded its attached stores.
     var isLoadedPublisher: AnyPublisher<Void, Never> { get }
@@ -79,15 +79,19 @@ public protocol JWWPersistentContainerProviding {
     /// Load a single persistent store.
     func load(store: NSPersistentStoreDescription) -> AnyPublisher<NSPersistentStoreDescription, Error>
 
+    /// Load all persistent stores.
+    func loadPersistentStores() async throws -> NSPersistentContainer.State
+
+    /// Load an individual persistent store.
+    ///
+    /// - Parameter store: The persistent store to load.
+    func load(store: NSPersistentStoreDescription) async throws -> NSPersistentContainer.State
+
     @available(iOS 15.0.0, macOS 12.0.0, tvOS 15.0.0, watchOS 8.0.0, *)
     func performBackgroundTask<T>(andSave shouldSave: Bool,
                                   transactionAuthor: String?,
                                   contextName name: String?,
                                   block: @escaping (NSManagedObjectContext) throws -> T) async rethrows -> T
-
-    @available(iOS 15.0.0, macOS 12.0.0, tvOS 15.0.0, watchOS 8.0.0, *)
-    @discardableResult
-    func loadPersistentStores() async throws -> [NSPersistentStoreDescription]
 }
 
 // MARK: Default Implementations
@@ -145,26 +149,28 @@ public extension JWWPersistentContainerProviding where Self: NSPersistentContain
         }
     }
 
-    @available(iOS 15.0.0, macOS 12.0.0, tvOS 15.0.0, watchOS 8.0.0, *)
     @discardableResult
-    func loadPersistentStores() async throws -> [NSPersistentStoreDescription] {
-        var cancellable: AnyCancellable?
-        var stores: [NSPersistentStoreDescription] = []
+    func loadPersistentStores() async throws -> NSPersistentContainer.State {
+        for store in persistentStoreDescriptions {
+            _ = try await load(store: store)
+        }
 
+        state = .loaded
+        return state
+    }
+
+    @discardableResult
+    func load(store: NSPersistentStoreDescription) async throws -> NSPersistentContainer.State {
         return try await withCheckedThrowingContinuation({ continuation in
-            cancellable = loadPersistentStores().sink(receiveCompletion: { completion in
-                switch completion {
-                case .failure(let error):
+            persistentStoreCoordinator.addPersistentStore(with: store) { (_, error) in
+                if let error {
+                    self.state = .failed(error)
                     continuation.resume(throwing: error)
-                case .finished:
-                    continuation.resume(returning: stores)
                 }
 
-                cancellable?.cancel()
-            }, receiveValue: { values in
-
-                stores.append(contentsOf: values)
-            })
+                self.state = .loaded
+                continuation.resume(returning: .loaded)
+            }
         })
     }
 
@@ -179,4 +185,19 @@ public extension JWWPersistentContainerProviding where Self: NSPersistentContain
             }
         }.eraseToAnyPublisher()
     }
+
+#if DEBUG
+    /// Reset the persistent store to its initial state.
+    ///
+    /// This is only used for testing purposes.
+    package func reset() {
+        do {
+            for store in persistentStoreCoordinator.persistentStores where store.url != nil {
+                try persistentStoreCoordinator.destroyPersistentStore(at: store.url!, type: .sqlite)
+            }
+        } catch let error {
+            fatalError("\(error)")
+        }
+    }
+#endif
 }
