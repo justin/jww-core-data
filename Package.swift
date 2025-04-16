@@ -14,15 +14,17 @@ let package = Package(
         .library(name: "JWW Core Data", targets: ["JWWCoreData"])
     ],
     dependencies: [
-        .package(name: "JWWCore", url: "git@github.com:justin/jww-standard-lib.git", from: "1.0.3")
+        .package(url: "https://github.com/justin/jww-standard-lib.git", from: "1.0.3")
     ],
     targets: [
         .target(name: "JWWCoreData",
                 dependencies: [
-                    "JWWCore"
+                    .product(name: "JWWCore", package: "jww-standard-lib")
                 ]),
         .testTarget(name: "JWWCoreDataTests",
-                    dependencies: ["JWWCoreData"],
+                    dependencies: [
+                        .product(name: "JWWCore", package: "jww-standard-lib")
+                    ],
                     resources: [
                         .process("Resources")
                     ]
