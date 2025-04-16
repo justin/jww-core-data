@@ -23,7 +23,8 @@ let package = Package(
                 ]),
         .testTarget(name: "JWWCoreDataTests",
                     dependencies: [
-                        .product(name: "JWWCore", package: "jww-standard-lib")
+                        .target(name: "JWWCoreData"),
+                        .product(name: "JWWCore", package: "jww-standard-lib"),
                     ],
                     resources: [
                         .process("Resources")

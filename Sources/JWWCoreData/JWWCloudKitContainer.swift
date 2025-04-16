@@ -5,7 +5,7 @@ import JWWCore
 import os
 
 /// A container that encapsulates the Core Data stack in your app.
-open class JWWCloudKitContainer: NSPersistentCloudKitContainer, JWWPersistentContainerProviding {
+open class JWWCloudKitContainer: NSPersistentCloudKitContainer, JWWPersistentContainerProviding, @unchecked Sendable {
     /// The current loading state of the persistent stores managed by the container.
     @Published public private(set) var state: NSPersistentContainer.State = .inactive
 
@@ -109,7 +109,7 @@ open class JWWCloudKitContainer: NSPersistentCloudKitContainer, JWWPersistentCon
                     return
                 }
 
-                viewContext.perform {
+                viewContext.perform { [viewContext] in
                     viewContext.mergeChanges(fromContextDidSave: notification)
                 }
             }

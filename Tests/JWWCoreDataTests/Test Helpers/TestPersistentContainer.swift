@@ -3,7 +3,7 @@ import Combine
 import CoreData
 import JWWCoreData
 
-final class TestPersistentContainer: NSPersistentContainer, JWWPersistentContainerProviding {
+final class TestPersistentContainer: NSPersistentContainer, JWWPersistentContainerProviding, @unchecked Sendable {
     /// The current loading state of the persistent stores managed by the container.
     @Published public private(set) var state: NSPersistentContainer.State = .inactive
 
