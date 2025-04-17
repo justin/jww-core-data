@@ -5,10 +5,10 @@ import PackageDescription
 let package = Package(
     name: "JWWData",
     platforms: [
-        .iOS(.v15),
-        .macOS(.v12),
-        .tvOS(.v15),
-        .watchOS(.v8)
+        .iOS(.v18),
+        .macOS(.v15),
+        .tvOS(.v18),
+        .watchOS(.v11)
     ],
     products: [
         .library(name: "JWWData", targets: ["JWWCoreData", "JWWSwiftData"]),

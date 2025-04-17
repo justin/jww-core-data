@@ -4,7 +4,6 @@ import SwiftData
 import JWWSwiftData
 
 /// Tests to verify the functionality of `JWWFetchedResultsController`.
-@Suite("JWWFetchedResultsController Tests")
 @MainActor
 final class JWWFetchedResultsControllerTests {
     private let sut: JWWFetchedResultsController<Person>
@@ -68,6 +67,7 @@ final class JWWFetchedResultsControllerTests {
     }
 }
 
+@available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
 final class JWWFetchedResultsControllerTestsDelegate: JWWFetchedResultsControllerDelegate {
     func controllerWillChangeContent(_ controller: JWWSwiftData.JWWFetchedResultsController<some PersistentModel>) {
         controllerWillChangeContentCalled = true
