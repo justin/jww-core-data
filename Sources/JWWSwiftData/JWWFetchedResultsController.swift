@@ -4,11 +4,15 @@ import CoreData
 import JWWCore
 import os
 
+private extension Logger {
+    /// Logger for logging related to SwiftData and CoreData.
+    static let package = Logger(subsystem: .default, category: .init(rawValue: "package"))
+}
+
 @available(macOS 14, iOS 17, tvOS 17, watchOS 10, *)
 public protocol JWWFetchedResultsControllerDelegate: AnyObject {
     func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
     func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
-    
 }
 
 @available(macOS 14, iOS 17, tvOS 17, watchOS 10, *)
@@ -21,7 +25,6 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
     private let container: ModelContainer
     private let modelContext: ModelContext
     private let fetchDescriptor: FetchDescriptor<T>
-
     private let databaseMonitor: JWWDatabaseMonitor
 
     // MARK: Initialization
@@ -29,11 +32,12 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
     // Initialization
     // ====================================
 
-    public init(fetchRequest: FetchDescriptor<T>, container: ModelContainer) {
+    public init(fetchRequest: FetchDescriptor<T>, container: ModelContainer, delegate: JWWFetchedResultsControllerDelegate? = nil) {
         self.container = container
         self.modelContext = container.mainContext
         self.fetchDescriptor = fetchRequest
         self.databaseMonitor = JWWDatabaseMonitor(modelContainer: container)
+        self.delegate = delegate
     }
 
     deinit {
@@ -68,10 +72,8 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
 @ModelActor
 private actor JWWDatabaseMonitor {
     func subscribeToModelChanges() async {
-        for await _ in NotificationCenter.default.notifications(
-            named: ModelContext.didSave
-        ).map({ _ in () }) {
-            print("Reloading widget timelines because of NSPersistentStoreRemoteChange!")
+        for await _ in NotificationCenter.default.notifications(named: ModelContext.didSave).map({ _ in () }) {
+            Logger.package.debug("Reloading widget timelines because of NSPersistentStoreRemoteChange!")
         }
     }
 }
