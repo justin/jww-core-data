@@ -1,6 +1,11 @@
 import Foundation
 import Testing
 import SwiftData
+#if canImport(AppKit)
+import AppKit
+#elseif canImport(UIKit)
+import UIKit
+#endif
 import JWWSwiftData
 
 /// Tests to verify the functionality of `JWWFetchedResultsController`.
@@ -74,7 +79,11 @@ final class JWWFetchedResultsControllerTestsDelegate: JWWFetchedResultsControlle
     func controller(_ controller: JWWSwiftData.JWWFetchedResultsController<some PersistentModel>, didChange object: Any, at indexPath: IndexPath?, for type: JWWSwiftData.JWWFetchedResultsChangeType, newIndexPath: IndexPath?) {
         controllerDidChangeForTypeCalled = true
     }
-    
+
+    func controller(_ controller: JWWSwiftData.JWWFetchedResultsController<some PersistentModel>, didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference) {
+        controllerDidChangeForSnapshot = true
+    }
+
     func controllerWillChangeContent(_ controller: JWWSwiftData.JWWFetchedResultsController<some PersistentModel>) {
         controllerWillChangeContentCalled = true
     }
@@ -83,11 +92,13 @@ final class JWWFetchedResultsControllerTestsDelegate: JWWFetchedResultsControlle
         controllerDidChangeContentCalled = true
     }
 
+    private(set) var controllerDidChangeForSnapshot: Bool
     private(set) var controllerWillChangeContentCalled: Bool
     private(set) var controllerDidChangeForTypeCalled: Bool
     private(set) var controllerDidChangeContentCalled: Bool
 
     init() {
+        self.controllerDidChangeForSnapshot = false
         self.controllerWillChangeContentCalled = false
         self.controllerDidChangeContentCalled = false
         self.controllerDidChangeForTypeCalled = false

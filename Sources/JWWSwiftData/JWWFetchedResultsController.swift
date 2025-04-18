@@ -1,6 +1,11 @@
 import Foundation
 import SwiftData
 import CoreData
+#if canImport(AppKit)
+import AppKit
+#elseif canImport(UIKit)
+import UIKit
+#endif
 import JWWCore
 import os
 import _JWWDataInternal
@@ -13,16 +18,24 @@ public enum JWWFetchedResultsChangeType: String, CaseIterable, Hashable {
 }
 
 @available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
-public struct FetchedResultsControlleChange<T: PersistentModel>: Hashable {
-    public let type: JWWFetchedResultsChangeType
-    public let model: T
-}
-
-@available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
 public protocol JWWFetchedResultsControllerDelegate: AnyObject {
     func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
+
     func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange object: Any, at indexPath: IndexPath?, for type: JWWFetchedResultsChangeType, newIndexPath: IndexPath?)
+
+    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference)
+
     func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
+}
+
+public extension JWWFetchedResultsControllerDelegate {
+    func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>) { }
+
+    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange object: Any, at indexPath: IndexPath?, for type: JWWFetchedResultsChangeType, newIndexPath: IndexPath?) { }
+
+    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference) { }
+
+    func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>) { }
 }
 
 @available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
