@@ -3,15 +3,25 @@ import SwiftData
 import CoreData
 import JWWCore
 import os
+import _JWWDataInternal
 
-private extension Logger {
-    /// Logger for logging related to SwiftData and CoreData.
-    static let package = Logger(subsystem: .default, category: .init(rawValue: "package"))
+@available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
+public enum JWWFetchedResultsChangeType: String, CaseIterable, Hashable {
+    case inserted
+    case updated
+    case deleted
+}
+
+@available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
+public struct FetchedResultsControlleChange<T: PersistentModel>: Hashable {
+    public let type: JWWFetchedResultsChangeType
+    public let model: T
 }
 
 @available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
 public protocol JWWFetchedResultsControllerDelegate: AnyObject {
     func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
+    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange object: Any, at indexPath: IndexPath?, for type: JWWFetchedResultsChangeType, newIndexPath: IndexPath?)
     func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
 }
 
@@ -82,8 +92,8 @@ private actor JWWDatabaseMonitor {
         for await userInfo in notificationCenter.notifications(named: ModelContext.didSave)
             .compactMap(\.userInfo)
             .map({ userInfo in
-                let categories = ["inserted", "deleted", "updated"]
-                let result: [String: [PersistentIdentifier]] = [:]
+                let categories = [JWWFetchedResultsChangeType.inserted, JWWFetchedResultsChangeType.deleted, JWWFetchedResultsChangeType.updated]
+                let result: [JWWFetchedResultsChangeType: [PersistentIdentifier]] = [:]
                 return categories.reduce(into: result) { result, category in
                     // Only insert the category into the result if it has values.
                     if let ids = userInfo[category] as? [PersistentIdentifier], !ids.isEmpty {

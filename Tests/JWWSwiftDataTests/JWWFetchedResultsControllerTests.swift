@@ -64,11 +64,17 @@ final class JWWFetchedResultsControllerTests {
 
         container.mainContext.insert(Person(id: UUID(), firstName: "Steve"))
         try container.mainContext.save()
+
+
     }
 }
 
 @available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
 final class JWWFetchedResultsControllerTestsDelegate: JWWFetchedResultsControllerDelegate {
+    func controller(_ controller: JWWSwiftData.JWWFetchedResultsController<some PersistentModel>, didChange object: Any, at indexPath: IndexPath?, for type: JWWSwiftData.JWWFetchedResultsChangeType, newIndexPath: IndexPath?) {
+        controllerDidChangeForTypeCalled = true
+    }
+    
     func controllerWillChangeContent(_ controller: JWWSwiftData.JWWFetchedResultsController<some PersistentModel>) {
         controllerWillChangeContentCalled = true
     }
@@ -78,10 +84,12 @@ final class JWWFetchedResultsControllerTestsDelegate: JWWFetchedResultsControlle
     }
 
     private(set) var controllerWillChangeContentCalled: Bool
+    private(set) var controllerDidChangeForTypeCalled: Bool
     private(set) var controllerDidChangeContentCalled: Bool
 
     init() {
         self.controllerWillChangeContentCalled = false
         self.controllerDidChangeContentCalled = false
+        self.controllerDidChangeForTypeCalled = false
     }
 }
