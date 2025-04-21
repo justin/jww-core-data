@@ -76,14 +76,6 @@ final class JWWFetchedResultsControllerTests {
 
 @available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
 final class JWWFetchedResultsControllerTestsDelegate: JWWFetchedResultsControllerDelegate {
-    func controller(_ controller: JWWSwiftData.JWWFetchedResultsController<some PersistentModel>, didChange object: Any, at indexPath: IndexPath?, for type: JWWSwiftData.JWWFetchedResultsChangeType, newIndexPath: IndexPath?) {
-        controllerDidChangeForTypeCalled = true
-    }
-
-    func controller(_ controller: JWWSwiftData.JWWFetchedResultsController<some PersistentModel>, didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference) {
-        controllerDidChangeForSnapshot = true
-    }
-
     func controllerWillChangeContent(_ controller: JWWSwiftData.JWWFetchedResultsController<some PersistentModel>) {
         controllerWillChangeContentCalled = true
     }
@@ -92,15 +84,11 @@ final class JWWFetchedResultsControllerTestsDelegate: JWWFetchedResultsControlle
         controllerDidChangeContentCalled = true
     }
 
-    private(set) var controllerDidChangeForSnapshot: Bool
     private(set) var controllerWillChangeContentCalled: Bool
-    private(set) var controllerDidChangeForTypeCalled: Bool
     private(set) var controllerDidChangeContentCalled: Bool
 
     init() {
-        self.controllerDidChangeForSnapshot = false
         self.controllerWillChangeContentCalled = false
         self.controllerDidChangeContentCalled = false
-        self.controllerDidChangeForTypeCalled = false
     }
 }

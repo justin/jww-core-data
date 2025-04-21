@@ -18,12 +18,8 @@ public enum JWWFetchedResultsChangeType: String, CaseIterable, Hashable {
 }
 
 @available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
-public protocol JWWFetchedResultsControllerDelegate: AnyObject {
+@MainActor public protocol JWWFetchedResultsControllerDelegate: AnyObject {
     func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
-
-    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange object: Any, at indexPath: IndexPath?, for type: JWWFetchedResultsChangeType, newIndexPath: IndexPath?)
-
-    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference)
 
     func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
 }
@@ -31,15 +27,10 @@ public protocol JWWFetchedResultsControllerDelegate: AnyObject {
 public extension JWWFetchedResultsControllerDelegate {
     func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>) { }
 
-    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange object: Any, at indexPath: IndexPath?, for type: JWWFetchedResultsChangeType, newIndexPath: IndexPath?) { }
-
-    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference) { }
-
     func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>) { }
 }
 
 @available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
-@Observable
 @MainActor
 public final class JWWFetchedResultsController<T: PersistentModel> {
     public unowned(unsafe) var delegate: (any JWWFetchedResultsControllerDelegate)?
@@ -59,6 +50,7 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
     // Initialization
     // ====================================
 
+    @MainActor
     public init(fetchRequest: FetchDescriptor<T>, container: ModelContainer, delegate: JWWFetchedResultsControllerDelegate? = nil) {
         self.container = container
         self.modelContext = container.mainContext
@@ -68,8 +60,9 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
     }
 
     deinit {
-        print("DEINIT")
-        //notificationsTask?.cancel()
+        Task { [notificationsTask] in
+            notificationsTask?.cancel()
+        }
     }
 
     // MARK: Public API
@@ -99,8 +92,6 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
 @available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
 @ModelActor
 private actor JWWDatabaseMonitor {
-    private let persistentHistoryTokenName: String = "asdf"
-
     func subscribeToModelChanges(notificationCenter: NotificationCenter) async {
         for await userInfo in notificationCenter.notifications(named: ModelContext.didSave)
             .compactMap(\.userInfo)
@@ -177,10 +168,10 @@ private actor JWWDatabaseMonitor {
     private lazy var historyTokenURL: URL = {
         guard let configuration = modelContainer.configurations.first(where: { $0.schema == modelContainer.schema && $0.isStoredInMemoryOnly == false })
         else {
-            fatalError()
+            fatalError("Could not find configuration for the persistent store")
         }
 
-        let url = configuration.url.appendingPathComponent("Reactions", isDirectory: true)
+        let url = configuration.url
         if !FileManager.default.fileExists(atPath: url.path) {
             do {
                 try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
@@ -190,6 +181,8 @@ private actor JWWDatabaseMonitor {
             }
         }
 
-        return url.appendingPathComponent(persistentHistoryTokenName, isDirectory: false)
+
+
+        return url.appendingPathComponent(configuration.name, isDirectory: false)
     }()
 }
