@@ -11,6 +11,11 @@ import os
 import _JWWDataInternal
 
 @available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
+public enum JWWFetchedResultsControllerError: Error {
+    case indexPathOutOfBounds
+}
+
+@available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
 public enum JWWFetchedResultsChangeType: String, CaseIterable, Hashable {
     case inserted
     case updated
@@ -18,7 +23,8 @@ public enum JWWFetchedResultsChangeType: String, CaseIterable, Hashable {
 }
 
 @available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
-@MainActor public protocol JWWFetchedResultsControllerDelegate: AnyObject {
+@MainActor
+public protocol JWWFetchedResultsControllerDelegate: AnyObject {
     func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
 
     func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
@@ -33,13 +39,12 @@ public extension JWWFetchedResultsControllerDelegate {
 @available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
 @MainActor
 public final class JWWFetchedResultsController<T: PersistentModel> {
-    public unowned(unsafe) var delegate: (any JWWFetchedResultsControllerDelegate)?
+    public nonisolated(unsafe) unowned(unsafe) var delegate: (any JWWFetchedResultsControllerDelegate)?
     public private(set) var fetchedModels: [T]?
+    public nonisolated let modelContainer: ModelContainer
 
-    private let container: ModelContainer
     private let modelContext: ModelContext
     private let fetchDescriptor: FetchDescriptor<T>
-    private let databaseMonitor: JWWDatabaseMonitor
     internal let notificationCenter: NotificationCenter = .default
 
     /// The task that is used to monitor the database for changes.
@@ -50,12 +55,10 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
     // Initialization
     // ====================================
 
-    @MainActor
-    public init(fetchRequest: FetchDescriptor<T>, container: ModelContainer, delegate: JWWFetchedResultsControllerDelegate? = nil) {
-        self.container = container
-        self.modelContext = container.mainContext
+    public init(fetchRequest: FetchDescriptor<T>, modelContainer: ModelContainer, delegate: JWWFetchedResultsControllerDelegate? = nil) {
         self.fetchDescriptor = fetchRequest
-        self.databaseMonitor = JWWDatabaseMonitor(modelContainer: container)
+        self.modelContainer = modelContainer
+        self.modelContext = ModelContext(modelContainer)
         self.delegate = delegate
     }
 
@@ -83,16 +86,33 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
             delegate.controllerDidChangeContent(self)
         }
 
-        notificationsTask = Task { [databaseMonitor, notificationCenter] in
-            await databaseMonitor.subscribeToModelChanges(notificationCenter: notificationCenter)
+        notificationsTask = Task { [notificationCenter] in
+            await subscribeToModelChanges(notificationCenter: notificationCenter)
         }
     }
-}
 
-@available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
-@ModelActor
-private actor JWWDatabaseMonitor {
-    func subscribeToModelChanges(notificationCenter: NotificationCenter) async {
+    public func object(at indexPath: IndexPath) throws (JWWFetchedResultsControllerError) -> T {
+        guard let models = fetchedModels, indexPath.section == 0, indexPath.item <= models.endIndex else {
+            throw JWWFetchedResultsControllerError.indexPathOutOfBounds
+        }
+
+        return models[indexPath.item]
+    }
+
+    public func indexPath(forObject object: T) -> IndexPath? {
+        guard let models = fetchedModels, let item = models.firstIndex(of: object) else {
+            return nil
+        }
+
+        return IndexPath(item: item, section: 0)
+    }
+
+    // MARK: Private / Convenience
+    // ====================================
+    // Private / Convenience
+    // ====================================
+
+    private func subscribeToModelChanges(notificationCenter: NotificationCenter) async {
         for await userInfo in notificationCenter.notifications(named: ModelContext.didSave)
             .compactMap(\.userInfo)
             .map({ userInfo in
@@ -142,7 +162,7 @@ private actor JWWDatabaseMonitor {
 
     // Track the last history token processed for a store, and write its value to file.
     // The historyQueue reads the token when executing operations, and updates it after processing is complete.
-    var mostRecentHistoryToken: DefaultHistoryToken? {
+    private var mostRecentHistoryToken: DefaultHistoryToken? {
         get {
             guard let data = try? Data(contentsOf: historyTokenURL) else {
                 return nil
@@ -166,7 +186,7 @@ private actor JWWDatabaseMonitor {
     }
 
     private lazy var historyTokenURL: URL = {
-        guard let configuration = modelContainer.configurations.first(where: { $0.schema == modelContainer.schema && $0.isStoredInMemoryOnly == false })
+        guard let configuration = modelContainer.configurations.first(where: { $0.schema == modelContainer.schema })
         else {
             fatalError("Could not find configuration for the persistent store")
         }

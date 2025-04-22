@@ -17,7 +17,17 @@ final class JWWFetchedResultsControllerTests {
 
     init() throws {
         container = JWWSwiftDataTestingStack().testingModelContainer
-        sut = JWWFetchedResultsController(fetchRequest: FetchDescriptor<Person>(), container: container)
+
+        var fetchDescriptor = FetchDescriptor<Person>()
+        fetchDescriptor.sortBy = [
+            SortDescriptor(\.firstName, order: .forward)
+        ]
+
+        sut = JWWFetchedResultsController(fetchRequest: fetchDescriptor, modelContainer: container)
+    }
+
+    deinit {
+        try? container.erase()
     }
 
     @Test("init")
@@ -69,8 +79,75 @@ final class JWWFetchedResultsControllerTests {
 
         container.mainContext.insert(Person(id: UUID(), firstName: "Steve"))
         try container.mainContext.save()
+    }
 
+    @Test("object(at:) returns correct object")
+    func objectAtIndexPath() async throws {
+        let people = [
+            Person(id: UUID(), firstName: "John"),
+            Person(id: UUID(), firstName: "Jane"),
+            Person(id: UUID(), firstName: "Doe")
+        ]
+        for person in people {
+            container.mainContext.insert(person)
+        }
+        try container.mainContext.save()
+        try await sut.fetch()
 
+        let indexPath = IndexPath(item: 1, section: 0)
+        let object = try sut.object(at: indexPath)
+        #expect(object.firstName == "Jane")
+    }
+
+    @Test("indexPath(forObject:) returns correct indexPath")
+    func indexPathForObject() async throws {
+        let people = [
+            Person(id: UUID(), firstName: "John"),
+            Person(id: UUID(), firstName: "Jane"),
+            Person(id: UUID(), firstName: "Doe")
+        ]
+        for person in people {
+            container.mainContext.insert(person)
+        }
+        try container.mainContext.save()
+        try await sut.fetch()
+
+        let object = try #require(sut.fetchedModels?.last)
+        let indexPath = sut.indexPath(forObject: object)
+        #expect(indexPath == IndexPath(item: 2, section: 0))
+    }
+
+    @Test("object(at:) throws for out-of-bounds indexPath")
+    func objectAtIndexPathOutOfBounds() async throws {
+        let people = [
+            Person(id: UUID(), firstName: "John")
+        ]
+        for person in people {
+            container.mainContext.insert(person)
+        }
+        try container.mainContext.save()
+        try await sut.fetch()
+
+        let indexPath = IndexPath(item: 10, section: 0)
+        #expect(throws: JWWFetchedResultsControllerError.indexPathOutOfBounds) {
+            try self.sut.object(at: indexPath)
+        }
+    }
+
+    @Test("indexPath(forObject:) returns nil for missing object")
+    func indexPathForNonexistentObject() async throws {
+        let people = [
+            Person(id: UUID(), firstName: "John")
+        ]
+        for person in people {
+            container.mainContext.insert(person)
+        }
+        try container.mainContext.save()
+        try await sut.fetch()
+
+        let missing = Person(id: UUID(), firstName: "Ghost")
+        let indexPath = sut.indexPath(forObject: missing)
+        #expect(indexPath == nil)
     }
 }
 
