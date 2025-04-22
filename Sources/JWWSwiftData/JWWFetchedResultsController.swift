@@ -27,11 +27,15 @@ public enum JWWFetchedResultsChangeType: String, CaseIterable, Hashable {
 public protocol JWWFetchedResultsControllerDelegate: AnyObject {
     func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
 
+    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange anObject: some PersistentModel, at indexPath: IndexPath?, for type: JWWFetchedResultsChangeType, newIndexPath: IndexPath?)
+
     func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
 }
 
 public extension JWWFetchedResultsControllerDelegate {
     func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>) { }
+
+    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange anObject: some PersistentModel, at indexPath: IndexPath?, for type: JWWFetchedResultsChangeType, newIndexPath: IndexPath?) { }
 
     func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>) { }
 }
@@ -140,6 +144,8 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
             }
         }
 
+        let context = ModelContext(modelContainer)
+        var results: Set<T> = []
         var transactions: [DefaultHistoryTransaction] = []
         do {
             transactions = try modelContext.fetchHistory(historyDescriptor)
@@ -147,6 +153,32 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
             if !transactions.isEmpty {
                 Logger.package.info("Processing \(transactions.count) history transactions.")
             }
+
+            for transaction in transactions {
+                for change in transaction.changes {
+                    let modelID = change.changedPersistentIdentifier
+                    let fetchDescriptor = FetchDescriptor<T>(predicate: #Predicate { thing in
+                        thing.persistentModelID == modelID
+                    })
+                    let fetchResults = try? context.fetch(fetchDescriptor)
+                    guard let matchedThing = fetchResults?.first else {
+                        continue
+                    }
+
+                    switch change {
+                    case .insert(_ as DefaultHistoryInsert<T>):
+                        results.insert(matchedThing)
+                    case .update(_ as DefaultHistoryUpdate<T>):
+                        results.update(with: matchedThing)
+                    case .delete(_ as DefaultHistoryDelete<T>):
+                        results.remove(matchedThing)
+                    default: break
+                    }
+                }
+
+            }
+
+            Logger.package.debug("Processed results are: \(String(describing: results))")
 
             // Update the history token using the last transaction. The last transaction has the latest token.
            if let newLastPersistentHistoryToken = transactions.last?.token {
@@ -157,7 +189,6 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
         } catch {
             Logger.package.error("Error while fetching history \(error, privacy: .public)")
         }
-
     }
 
     // Track the last history token processed for a store, and write its value to file.
