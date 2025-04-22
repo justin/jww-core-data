@@ -100,24 +100,24 @@ private actor JWWDatabaseMonitor {
                 let result: [JWWFetchedResultsChangeType: [PersistentIdentifier]] = [:]
                 return categories.reduce(into: result) { result, category in
                     // Only insert the category into the result if it has values.
-                    if let ids = userInfo[category] as? [PersistentIdentifier], !ids.isEmpty {
+                    if let ids = userInfo[category.rawValue] as? [PersistentIdentifier], !ids.isEmpty {
                         result[category] = ids
                     }
                 }
             })
-                .filter({ !$0.isEmpty }) { // Skip any empty dictionaries since there's nothing worth doing.
+            .filter({ !$0.isEmpty }) { // Skip any empty dictionaries since there's nothing worth doing.
             Logger.package.debug("Reloading widget timelines because of \(userInfo)")
             await processHistory()
         }
     }
 
     private func processHistory() async {
-        guard let token = mostRecentHistoryToken else {
-            return
-        }
         var historyDescriptor = HistoryDescriptor<DefaultHistoryTransaction>()
-        historyDescriptor.predicate = #Predicate { transaction in
-            (transaction.token > token)
+
+        if let token = mostRecentHistoryToken {
+            historyDescriptor.predicate = #Predicate { transaction in
+                (transaction.token > token)
+            }
         }
 
         var transactions: [DefaultHistoryTransaction] = []
@@ -181,8 +181,7 @@ private actor JWWDatabaseMonitor {
             }
         }
 
-
-
-        return url.appendingPathComponent(configuration.name, isDirectory: false)
+        let tokenName = "\(configuration.name).json"
+        return url.deletingLastPathComponent().appendingPathComponent(tokenName, isDirectory: false)
     }()
 }
