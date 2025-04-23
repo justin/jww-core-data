@@ -57,14 +57,18 @@ public extension JWWFetchedResultsControllerDelegate {
 
 @available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
 @MainActor
-public final class JWWFetchedResultsController<T: PersistentModel> {
+public final class JWWFetchedResultsController<PersistentModelType: PersistentModel> {
+    public typealias SectionIdentifierType = AnyHashable
+    public typealias SectionKeyPath = KeyPath<PersistentModelType, SectionIdentifierType>
+
     public nonisolated(unsafe) unowned(unsafe) var delegate: (any JWWFetchedResultsControllerDelegate)?
-    public private(set) var fetchedModels: [T]?
+    public private(set) var fetchedModels: [PersistentModelType]?
     public nonisolated let modelContainer: ModelContainer
 
     private let modelContext: ModelContext
-    private let fetchDescriptor: FetchDescriptor<T>
+    private let fetchDescriptor: FetchDescriptor<PersistentModelType>
     internal let notificationCenter: NotificationCenter = .default
+    private let sectionKeyPath: SectionKeyPath?
 
     /// The task that is used to monitor the database for changes.
     private var notificationsTask: Task<Void, Never>?
@@ -74,11 +78,12 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
     // Initialization
     // ====================================
 
-    public init(fetchDescriptor: FetchDescriptor<T>, modelContainer: ModelContainer, delegate: JWWFetchedResultsControllerDelegate? = nil) {
+    public init(fetchDescriptor: FetchDescriptor<PersistentModelType>, modelContainer: ModelContainer, sectionKeyPath: SectionKeyPath? = nil, delegate: JWWFetchedResultsControllerDelegate? = nil) {
         self.fetchDescriptor = fetchDescriptor
         self.modelContainer = modelContainer
         self.modelContext = ModelContext(modelContainer)
         self.delegate = delegate
+        self.sectionKeyPath = sectionKeyPath
     }
 
     deinit {
@@ -97,12 +102,18 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
 
         fetchedModels = results
 
+        if let sectionKeyPath {
+            let grouped = Dictionary(grouping: results, by: { $0[keyPath: sectionKeyPath] })
+
+            Logger.package.debug("Fetched result sections are: \(String(describing: grouped.keys.map(\.description)), privacy: .public)")
+        }
+
         notificationsTask = Task { [notificationCenter] in
             await subscribeToModelChanges(notificationCenter: notificationCenter)
         }
     }
 
-    public func object(at indexPath: IndexPath) throws (JWWFetchedResultsControllerError) -> T {
+    public func object(at indexPath: IndexPath) throws (JWWFetchedResultsControllerError) -> PersistentModelType {
         guard let models = fetchedModels, indexPath.section == 0, indexPath.item <= models.endIndex else {
             throw JWWFetchedResultsControllerError.indexPathOutOfBounds
         }
@@ -110,7 +121,7 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
         return models[indexPath.item]
     }
 
-    public func indexPath(forObject object: T) -> IndexPath? {
+    public func indexPath(forObject object: PersistentModelType) -> IndexPath? {
         guard let models = fetchedModels, let item = models.firstIndex(of: object) else {
             return nil
         }
@@ -152,7 +163,7 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
         }
 
         let context = ModelContext(modelContainer)
-        var results: Set<T> = []
+        var results: Set<PersistentModelType> = []
         var transactions: [DefaultHistoryTransaction] = []
         do {
             transactions = try modelContext.fetchHistory(historyDescriptor)
@@ -164,7 +175,7 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
             for transaction in transactions {
                 for change in transaction.changes {
                     let modelID = change.changedPersistentIdentifier
-                    let fetchDescriptor = FetchDescriptor<T>(predicate: #Predicate { object in
+                    let fetchDescriptor = FetchDescriptor<PersistentModelType>(predicate: #Predicate { object in
                         object.persistentModelID == modelID
                     })
                     let fetchResults = try? context.fetch(fetchDescriptor)
@@ -173,11 +184,11 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
                     }
 
                     switch change {
-                    case .insert(_ as DefaultHistoryInsert<T>):
+                    case .insert(_ as DefaultHistoryInsert<PersistentModelType>):
                         results.insert(object)
-                    case .update(_ as DefaultHistoryUpdate<T>):
+                    case .update(_ as DefaultHistoryUpdate<PersistentModelType>):
                         results.update(with: object)
-                    case .delete(_ as DefaultHistoryDelete<T>):
+                    case .delete(_ as DefaultHistoryDelete<PersistentModelType>):
                         results.remove(object)
                     default:
                         break

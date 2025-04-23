@@ -117,6 +117,19 @@ final class JWWFetchedResultsControllerTests {
         #expect(indexPath == nil)
     }
 
+    @Suite("Sectioned Fetch Results") {
+        @Test("Setting sectionNameKeyPath correctly groups fetched results into sections")
+        func initWithSectionNameKeyPath() async throws {
+            let frc = JWWFetchedResultsController<Person>(
+                fetchDescriptor: FetchDescriptor<Person>(),
+                modelContainer: container,
+                sectionNameKeyPath: \.firstName
+            )
+
+            try await frc.fetch()
+        }
+    }
+
     // MARK: Private / Convenience
     // ====================================
     // Private / Convenience
