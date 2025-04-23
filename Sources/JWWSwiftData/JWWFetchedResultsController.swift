@@ -37,38 +37,38 @@ private struct Section: JWWFetchedResultsSectionInfo {
     let objects: [Any]
 }
 
-//@available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
-//@MainActor
-//public protocol JWWFetchedResultsControllerDelegate: AnyObject {
-//    func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
-//
+@available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
+@MainActor
+public protocol JWWFetchedResultsControllerDelegate: AnyObject {
+    func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some Hashable, some PersistentModel>)
+
 //    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange sectionInfo: any JWWFetchedResultsSectionInfo, atSectionIndex sectionIndex: Int, for type: JWWFetchedResultsChangeType)
 //
 //    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange anObject: some PersistentModel, at indexPath: IndexPath?, for type: JWWFetchedResultsChangeType, newIndexPath: IndexPath?)
 //
 //    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference)
 //
-//    func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
-//}
-//
-//public extension JWWFetchedResultsControllerDelegate {
-//    func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>) { }
+    func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some Hashable, some PersistentModel>)
+}
+
+public extension JWWFetchedResultsControllerDelegate {
+    func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some Hashable, some PersistentModel>) { }
 //
 //    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange sectionInfo: any JWWFetchedResultsSectionInfo, atSectionIndex sectionIndex: Int, for type: JWWFetchedResultsChangeType) { }
 //
 //    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange anObject: some PersistentModel, at indexPath: IndexPath?, for type: JWWFetchedResultsChangeType, newIndexPath: IndexPath?) { }
 //
 //    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference) { }
-//
-//    func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>) { }
-//}
+
+    func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some Hashable, some PersistentModel>) { }
+}
 
 @available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
 @MainActor
 public final class JWWFetchedResultsController<SectionIdentifierType: Hashable, PersistentModelType: PersistentModel> {
     public typealias SectionKeyPath = KeyPath<PersistentModelType, SectionIdentifierType>
 
-//    public nonisolated(unsafe) unowned(unsafe) var delegate: (any JWWFetchedResultsControllerDelegate)?
+    public nonisolated(unsafe) unowned(unsafe) var delegate: (any JWWFetchedResultsControllerDelegate)?
     public private(set) var fetchedModels: [PersistentModelType]?
     public nonisolated let modelContainer: ModelContainer
 
@@ -91,11 +91,11 @@ public final class JWWFetchedResultsController<SectionIdentifierType: Hashable, 
     // Initialization
     // ====================================
 
-    public init(fetchDescriptor: FetchDescriptor<PersistentModelType>, modelContainer: ModelContainer, sectionKeyPath: SectionKeyPath? = nil) { // , delegate: JWWFetchedResultsControllerDelegate? = nil) {
+    public init(fetchDescriptor: FetchDescriptor<PersistentModelType>, modelContainer: ModelContainer, sectionKeyPath: SectionKeyPath? = nil, delegate: JWWFetchedResultsControllerDelegate? = nil) {
         self.fetchDescriptor = fetchDescriptor
         self.modelContainer = modelContainer
         self.modelContext = ModelContext(modelContainer)
-//        self.delegate = delegate
+        self.delegate = delegate
         self.sectionKeyPath = sectionKeyPath
         self.sections = []
     }
@@ -157,11 +157,12 @@ public final class JWWFetchedResultsController<SectionIdentifierType: Hashable, 
     }
 
     public func indexPath(forObject object: PersistentModelType) -> IndexPath? {
-        guard let models = fetchedModels, let item = models.firstIndex(of: object) else {
-            return nil
+        for (sectionIndex, section) in sections.enumerated() {
+            if let rowIndex = section.objects.firstIndex(where: { $0 as? PersistentModelType == object }) {
+                return IndexPath(item: rowIndex, section: sectionIndex)
+            }
         }
-
-        return IndexPath(item: item, section: 0)
+        return nil
     }
 
     // MARK: Private / Convenience
