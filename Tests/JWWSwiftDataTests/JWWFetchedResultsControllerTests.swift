@@ -23,7 +23,7 @@ final class JWWFetchedResultsControllerTests {
             SortDescriptor(\.firstName, order: .forward)
         ]
 
-        sut = JWWFetchedResultsController(fetchRequest: fetchDescriptor, modelContainer: container)
+        sut = JWWFetchedResultsController(fetchDescriptor: fetchDescriptor, modelContainer: container)
     }
 
     deinit {

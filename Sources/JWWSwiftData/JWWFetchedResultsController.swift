@@ -74,8 +74,8 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
     // Initialization
     // ====================================
 
-    public init(fetchRequest: FetchDescriptor<T>, modelContainer: ModelContainer, delegate: JWWFetchedResultsControllerDelegate? = nil) {
-        self.fetchDescriptor = fetchRequest
+    public init(fetchDescriptor: FetchDescriptor<T>, modelContainer: ModelContainer, delegate: JWWFetchedResultsControllerDelegate? = nil) {
+        self.fetchDescriptor = fetchDescriptor
         self.modelContainer = modelContainer
         self.modelContext = ModelContext(modelContainer)
         self.delegate = delegate
