@@ -28,13 +28,13 @@ public enum JWWFetchedResultsChangeType: String, CaseIterable, Hashable {
 public protocol JWWFetchedResultsSectionInfo {
     var name: String { get }
     var numberOfObjects: Int { get }
-    var objects: [Any]? { get }
+    var objects: [Any] { get }
 }
 
 private struct Section: JWWFetchedResultsSectionInfo {
     let name: String
     let numberOfObjects: Int
-    let objects: [Any]?
+    let objects: [Any]
 }
 
 //@available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
@@ -140,7 +140,8 @@ public final class JWWFetchedResultsController<SectionIdentifierType: Hashable, 
             throw JWWFetchedResultsControllerError.sectionNotFound
         }
 
-        guard let objects = section.objects, objects.isEmpty == false else {
+        let objects = section.objects
+        if objects.isEmpty {
             throw JWWFetchedResultsControllerError.objectNotFound
         }
 
