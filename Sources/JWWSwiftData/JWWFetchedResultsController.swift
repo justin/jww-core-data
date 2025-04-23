@@ -120,8 +120,10 @@ public final class JWWFetchedResultsController<SectionIdentifierType: Hashable, 
         if let sectionKeyPath {
             grouped = Dictionary(grouping: results, by: { $0[keyPath: sectionKeyPath] })
             sections = grouped.map { (key, value) in
-                Section(name: "\(key)", numberOfObjects: value.count, objects: value)
+                Section(name: "\(key)", numberOfObjects: value.count, objects: value.sorted(using: fetchDescriptor.sortBy))
             }
+            .sorted { $0.name < $1.name }
+
         } else {
             sections = [Section(name: "All", numberOfObjects: results.count, objects: results)]
         }

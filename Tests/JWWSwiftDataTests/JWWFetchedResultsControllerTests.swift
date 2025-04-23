@@ -161,6 +161,7 @@ final class JWWFetchedResultsControllerSectionedTests {
 
         var fetchDescriptor = FetchDescriptor<Person>()
         fetchDescriptor.sortBy = [
+            SortDescriptor(\.role.rawValue, order: .forward),
             SortDescriptor(\.firstName, order: .forward)
         ]
 
@@ -185,12 +186,15 @@ final class JWWFetchedResultsControllerSectionedTests {
 
     @Test("indexPath(forObject:) returns correct indexPath")
     func indexPathForObject() async throws {
+        let expectedResult = IndexPath(item: 0, section: 0)
         try insertDefaultObjects()
         try await sut.fetch()
 
-        let object = try #require(sut.fetchedModels?.last)
-        let indexPath = sut.indexPath(forObject: object)
-        #expect(indexPath == IndexPath(item: 2, section: 1))
+        let object = try #require(sut.fetchedModels?.first(where: { $0.role == .admin }))
+
+        print("Object is \(object.firstName!)")
+        let result = try #require(sut.indexPath(forObject: object))
+        #expect(result == expectedResult, "Expected indexPath to be \(expectedResult), but got \(result)")
     }
 
     @Test("object(at:) throws for out-of-bounds indexPath section")
