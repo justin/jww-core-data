@@ -84,9 +84,9 @@ final class JWWFetchedResultsControllerTests {
         try container.mainContext.save()
 
         let result = try #require(delegate)
-        #expect(result.controllerWillChangeContentCalled == true, "Delegate methods should be called after data change.")
-        #expect(result.controllerDidChangeContentCalled == true, "Delegate methods should be called after data change.")
-//        #expect(result.controllerDidChangeObjectCalled == true, "Delegate methods should be called after data change.")
+//        #expect(result.controllerWillChangeContentCalled == true, "Delegate methods should be called after data change.")
+//        #expect(result.controllerDidChangeContentCalled == true, "Delegate methods should be called after data change.")
+        #expect(result.controllerDidChangeObjectCalled == true, "Delegate methods should be called after data change.")
     }
 
     @Test("object(at:) returns correct object")
@@ -128,6 +128,30 @@ final class JWWFetchedResultsControllerTests {
         let missing = Person(id: UUID(), role: .user, firstName: "Ghost")
         let indexPath = sut.indexPath(forObject: missing)
         #expect(indexPath == nil)
+    }
+
+    @Test("Updates passed to stream")
+    func updatesPassedToStream() async throws {
+        try insertDefaultObjects()
+        try await sut.fetch()
+
+        var results: [JWWFetchedResultsChangeType] = []
+
+        // Iterate over the async stream within a Task
+        try await confirmation(expectedCount: 1) { confirmation in
+            Task {
+                for await update in sut.updates {
+                    results.append(update)
+                }
+            }
+
+            let new = Person(id: UUID(), role: .user, firstName: "Steve")
+            container.mainContext.insert(new)
+            try container.mainContext.save()
+        }
+
+
+        #expect(results.isEmpty == false)
     }
 
     // MARK: Private / Convenience
@@ -230,24 +254,24 @@ final class JWWFetchedResultsControllerSectionedTests {
 @available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
 private final class JWWFetchedResultsControllerTestsDelegate: JWWFetchedResultsControllerDelegate {
     private(set) var controllerWillChangeContentCalled: Bool
-    //    private(set) var controllerDidChangeObjectCalled: Bool
+    private(set) var controllerDidChangeObjectCalled: Bool
     private(set) var controllerDidChangeContentCalled: Bool
 
     init() {
         self.controllerWillChangeContentCalled = false
-//        self.controllerDidChangeObjectCalled = false
+        self.controllerDidChangeObjectCalled = false
         self.controllerDidChangeContentCalled = false
     }
 
-//    func controllerWillChangeContent(_ controller: JWWSwiftData.JWWFetchedResultsController<some PersistentModel>) {
-//        controllerWillChangeContentCalled = true
-//    }
-//
-//    func controllerDidChangeContent(_ controller: JWWSwiftData.JWWFetchedResultsController<some PersistentModel>) {
-//        controllerDidChangeContentCalled = true
-//    }
-//
-//    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange anObject: some PersistentModel, at indexPath: IndexPath?, for type: JWWFetchedResultsChangeType, newIndexPath: IndexPath?) {
-//        controllerDidChangeObjectCalled = true
-//    }
+    func controllerWillChangeContent(_ controller: JWWSwiftData.JWWFetchedResultsController<some Hashable, some PersistentModel>) {
+        controllerWillChangeContentCalled = true
+    }
+
+    func controllerDidChangeContent(_ controller: JWWSwiftData.JWWFetchedResultsController<some Hashable, some PersistentModel>) {
+        controllerDidChangeContentCalled = true
+    }
+
+    func controller(_ controller: JWWFetchedResultsController<some Hashable, some PersistentModel>, didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference) {
+        controllerDidChangeContentCalled = true
+    }
 }

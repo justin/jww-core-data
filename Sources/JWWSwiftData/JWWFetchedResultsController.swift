@@ -46,19 +46,19 @@ public protocol JWWFetchedResultsControllerDelegate: AnyObject {
 //
 //    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange anObject: some PersistentModel, at indexPath: IndexPath?, for type: JWWFetchedResultsChangeType, newIndexPath: IndexPath?)
 //
-//    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference)
+    func controller(_ controller: JWWFetchedResultsController<some Hashable, some PersistentModel>, didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference)
 //
     func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some Hashable, some PersistentModel>)
 }
 
 public extension JWWFetchedResultsControllerDelegate {
     func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some Hashable, some PersistentModel>) { }
-//
+
 //    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange sectionInfo: any JWWFetchedResultsSectionInfo, atSectionIndex sectionIndex: Int, for type: JWWFetchedResultsChangeType) { }
 //
 //    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange anObject: some PersistentModel, at indexPath: IndexPath?, for type: JWWFetchedResultsChangeType, newIndexPath: IndexPath?) { }
 //
-//    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference) { }
+    func controller(_ controller: JWWFetchedResultsController<some Hashable, some PersistentModel>, didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference) { }
 
     func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some Hashable, some PersistentModel>) { }
 }
@@ -72,6 +72,8 @@ public final class JWWFetchedResultsController<SectionIdentifierType: Hashable, 
     public private(set) var fetchedModels: [PersistentModelType]?
     public nonisolated let modelContainer: ModelContainer
 
+    public let updates: AsyncStream<JWWFetchedResultsChangeType>
+
     public private(set) var sections: [any JWWFetchedResultsSectionInfo]
 
     public var sectionIndexTitles: [String] {
@@ -83,8 +85,13 @@ public final class JWWFetchedResultsController<SectionIdentifierType: Hashable, 
     internal let notificationCenter: NotificationCenter = .default
     private let sectionKeyPath: SectionKeyPath?
 
+    /// The continuation for the events stream.
+    private var continuation: AsyncStream<JWWFetchedResultsChangeType>.Continuation
+
     /// The task that is used to monitor the database for changes.
     private var notificationsTask: Task<Void, Never>?
+
+    private var currentSnapshot: NSDiffableDataSourceSnapshot<SectionIdentifierType, PersistentIdentifier> = .init()
 
     // MARK: Initialization
     // ====================================
@@ -98,6 +105,10 @@ public final class JWWFetchedResultsController<SectionIdentifierType: Hashable, 
         self.delegate = delegate
         self.sectionKeyPath = sectionKeyPath
         self.sections = []
+
+        let (stream, continuation) = AsyncStream.makeStream(of: JWWFetchedResultsChangeType.self)
+        self.updates = stream
+        self.continuation = continuation
     }
 
     deinit {
@@ -119,6 +130,7 @@ public final class JWWFetchedResultsController<SectionIdentifierType: Hashable, 
         let grouped: Dictionary<SectionIdentifierType, [PersistentModelType]>
         if let sectionKeyPath {
             grouped = Dictionary(grouping: results, by: { $0[keyPath: sectionKeyPath] })
+
             sections = grouped.map { (key, value) in
                 Section(name: "\(key)", numberOfObjects: value.count, objects: value.sorted(using: fetchDescriptor.sortBy))
             }
@@ -191,6 +203,7 @@ public final class JWWFetchedResultsController<SectionIdentifierType: Hashable, 
         }
     }
 
+
     private func processHistory() async {
         var historyDescriptor = HistoryDescriptor<DefaultHistoryTransaction>()
 
@@ -210,38 +223,58 @@ public final class JWWFetchedResultsController<SectionIdentifierType: Hashable, 
                 Logger.package.info("Processing \(transactions.count) history transactions.")
             }
 
+            var newSnapshot = currentSnapshot
+
             for transaction in transactions {
                 for change in transaction.changes {
                     let modelID = change.changedPersistentIdentifier
-                    let fetchDescriptor = FetchDescriptor<PersistentModelType>(predicate: #Predicate { object in
-                        object.persistentModelID == modelID
-                    })
-                    let fetchResults = try? context.fetch(fetchDescriptor)
-                    guard let object = fetchResults?.first else {
-                        continue
-                    }
 
                     switch change {
                     case .insert(_ as DefaultHistoryInsert<PersistentModelType>):
-                        results.insert(object)
+                        // Find the section for the inserted object
+                        if let sectionKeyPath = sectionKeyPath {
+                            let fetchDescriptor = FetchDescriptor<PersistentModelType>(predicate: #Predicate { object in
+                                object.persistentModelID == modelID
+                            })
+                            if let object = try? context.fetch(fetchDescriptor).first {
+                                let sectionIdentifier = object[keyPath: sectionKeyPath]
+                                if !newSnapshot.sectionIdentifiers.contains(sectionIdentifier) {
+                                    newSnapshot.appendSections([sectionIdentifier])
+                                }
+                                newSnapshot.appendItems([modelID], toSection: sectionIdentifier)
+                            }
+                        } else {
+                            if newSnapshot.sectionIdentifiers.isEmpty {
+                                newSnapshot.appendSections(["All" as! SectionIdentifierType])
+                            }
+                            newSnapshot.appendItems([modelID], toSection: newSnapshot.sectionIdentifiers.first!)
+                        }
                     case .update(_ as DefaultHistoryUpdate<PersistentModelType>):
-                        results.update(with: object)
+                        // For update, you may want to reload the item
+                        newSnapshot.reloadItems([modelID])
                     case .delete(_ as DefaultHistoryDelete<PersistentModelType>):
-                        results.remove(object)
+                        newSnapshot.deleteItems([modelID])
                     default:
                         break
                     }
                 }
             }
 
+            // Update the current snapshot
+            currentSnapshot = newSnapshot
+            if let delegate {
+                let snapshotRef = newSnapshot as NSDiffableDataSourceSnapshotReference
+                delegate.controller(self, didChangeContentWith: snapshotRef)
+            }
+
             Logger.package.debug("Processed results are: \(String(describing: results))")
 
             // Update the history token using the last transaction. The last transaction has the latest token.
-           if let newLastPersistentHistoryToken = transactions.last?.token {
-               Logger.package.debug("History returned new token: \(String(describing: newLastPersistentHistoryToken), privacy: .public)")
+            if let newLastPersistentHistoryToken = transactions.last?.token {
+                Logger.package.debug("History returned new token: \(String(describing: newLastPersistentHistoryToken), privacy: .public)")
 
-               mostRecentHistoryToken = newLastPersistentHistoryToken
-           }
+                mostRecentHistoryToken = newLastPersistentHistoryToken
+            }
         } catch {
             Logger.package.error("Error while fetching history \(error, privacy: .public)")
         }
