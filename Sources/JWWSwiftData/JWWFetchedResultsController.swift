@@ -13,6 +13,9 @@ import _JWWDataInternal
 @available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
 public enum JWWFetchedResultsControllerError: Error {
     case indexPathOutOfBounds
+    case objectNotFound
+    case sectionIndexOutOfBounds
+    case sectionNotFound
 }
 
 @available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
@@ -24,46 +27,56 @@ public enum JWWFetchedResultsChangeType: String, CaseIterable, Hashable {
 
 public protocol JWWFetchedResultsSectionInfo {
     var name: String { get }
-    var indexTitle: String? { get }
     var numberOfObjects: Int { get }
     var objects: [Any]? { get }
 }
 
-@available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
-@MainActor
-public protocol JWWFetchedResultsControllerDelegate: AnyObject {
-    func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
-
-    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange sectionInfo: any JWWFetchedResultsSectionInfo, atSectionIndex sectionIndex: Int, for type: JWWFetchedResultsChangeType)
-
-    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange anObject: some PersistentModel, at indexPath: IndexPath?, for type: JWWFetchedResultsChangeType, newIndexPath: IndexPath?)
-
-    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference)
-
-    func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
+private struct Section: JWWFetchedResultsSectionInfo {
+    let name: String
+    let numberOfObjects: Int
+    let objects: [Any]?
 }
 
-public extension JWWFetchedResultsControllerDelegate {
-    func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>) { }
-
-    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange sectionInfo: any JWWFetchedResultsSectionInfo, atSectionIndex sectionIndex: Int, for type: JWWFetchedResultsChangeType) { }
-
-    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange anObject: some PersistentModel, at indexPath: IndexPath?, for type: JWWFetchedResultsChangeType, newIndexPath: IndexPath?) { }
-
-    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference) { }
-
-    func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>) { }
-}
+//@available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
+//@MainActor
+//public protocol JWWFetchedResultsControllerDelegate: AnyObject {
+//    func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
+//
+//    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange sectionInfo: any JWWFetchedResultsSectionInfo, atSectionIndex sectionIndex: Int, for type: JWWFetchedResultsChangeType)
+//
+//    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange anObject: some PersistentModel, at indexPath: IndexPath?, for type: JWWFetchedResultsChangeType, newIndexPath: IndexPath?)
+//
+//    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference)
+//
+//    func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
+//}
+//
+//public extension JWWFetchedResultsControllerDelegate {
+//    func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>) { }
+//
+//    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange sectionInfo: any JWWFetchedResultsSectionInfo, atSectionIndex sectionIndex: Int, for type: JWWFetchedResultsChangeType) { }
+//
+//    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange anObject: some PersistentModel, at indexPath: IndexPath?, for type: JWWFetchedResultsChangeType, newIndexPath: IndexPath?) { }
+//
+//    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference) { }
+//
+//    func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>) { }
+//}
 
 @available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
 @MainActor
-public final class JWWFetchedResultsController<PersistentModelType: PersistentModel> {
-    public typealias SectionIdentifierType = AnyHashable
+public final class JWWFetchedResultsController<SectionIdentifierType: Hashable, PersistentModelType: PersistentModel> {
     public typealias SectionKeyPath = KeyPath<PersistentModelType, SectionIdentifierType>
 
-    public nonisolated(unsafe) unowned(unsafe) var delegate: (any JWWFetchedResultsControllerDelegate)?
+//    public nonisolated(unsafe) unowned(unsafe) var delegate: (any JWWFetchedResultsControllerDelegate)?
     public private(set) var fetchedModels: [PersistentModelType]?
     public nonisolated let modelContainer: ModelContainer
+
+    public private(set) var sections: [any JWWFetchedResultsSectionInfo]
+
+    public var sectionIndexTitles: [String] {
+        return sections.map(\.name)
+    }
 
     private let modelContext: ModelContext
     private let fetchDescriptor: FetchDescriptor<PersistentModelType>
@@ -78,12 +91,13 @@ public final class JWWFetchedResultsController<PersistentModelType: PersistentMo
     // Initialization
     // ====================================
 
-    public init(fetchDescriptor: FetchDescriptor<PersistentModelType>, modelContainer: ModelContainer, sectionKeyPath: SectionKeyPath? = nil, delegate: JWWFetchedResultsControllerDelegate? = nil) {
+    public init(fetchDescriptor: FetchDescriptor<PersistentModelType>, modelContainer: ModelContainer, sectionKeyPath: SectionKeyPath? = nil) { // , delegate: JWWFetchedResultsControllerDelegate? = nil) {
         self.fetchDescriptor = fetchDescriptor
         self.modelContainer = modelContainer
         self.modelContext = ModelContext(modelContainer)
-        self.delegate = delegate
+//        self.delegate = delegate
         self.sectionKeyPath = sectionKeyPath
+        self.sections = []
     }
 
     deinit {
@@ -102,10 +116,14 @@ public final class JWWFetchedResultsController<PersistentModelType: PersistentMo
 
         fetchedModels = results
 
+        let grouped: Dictionary<SectionIdentifierType, [PersistentModelType]>
         if let sectionKeyPath {
-            let grouped = Dictionary(grouping: results, by: { $0[keyPath: sectionKeyPath] })
-
-            Logger.package.debug("Fetched result sections are: \(String(describing: grouped.keys.map(\.description)), privacy: .public)")
+            grouped = Dictionary(grouping: results, by: { $0[keyPath: sectionKeyPath] })
+            sections = grouped.map { (key, value) in
+                Section(name: "\(key)", numberOfObjects: value.count, objects: value)
+            }
+        } else {
+            sections = [Section(name: "All", numberOfObjects: results.count, objects: results)]
         }
 
         notificationsTask = Task { [notificationCenter] in
@@ -114,11 +132,27 @@ public final class JWWFetchedResultsController<PersistentModelType: PersistentMo
     }
 
     public func object(at indexPath: IndexPath) throws (JWWFetchedResultsControllerError) -> PersistentModelType {
-        guard let models = fetchedModels, indexPath.section == 0, indexPath.item <= models.endIndex else {
+        guard indexPath.section < sections.endIndex else {
+            throw JWWFetchedResultsControllerError.sectionIndexOutOfBounds
+        }
+
+        guard let section = sections[indexPath.section] as? Section else {
+            throw JWWFetchedResultsControllerError.sectionNotFound
+        }
+
+        guard let objects = section.objects, objects.isEmpty == false else {
+            throw JWWFetchedResultsControllerError.objectNotFound
+        }
+
+        guard indexPath.item < objects.endIndex else {
             throw JWWFetchedResultsControllerError.indexPathOutOfBounds
         }
 
-        return models[indexPath.item]
+        guard let result = objects[indexPath.item] as? PersistentModelType else {
+            throw JWWFetchedResultsControllerError.objectNotFound
+        }
+
+        return result
     }
 
     public func indexPath(forObject object: PersistentModelType) -> IndexPath? {
