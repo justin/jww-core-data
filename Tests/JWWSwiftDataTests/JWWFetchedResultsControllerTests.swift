@@ -37,17 +37,8 @@ final class JWWFetchedResultsControllerTests {
     }
 
     @Test("Fetching initial data")
-    func fetchData() async throws {
-        let people = [
-            Person(id: UUID(), firstName: "John"),
-            Person(id: UUID(), firstName: "Jane"),
-            Person(id: UUID(), firstName: "Doe")
-        ]
-
-        for person in people {
-            container.mainContext.insert(person)
-        }
-        try container.mainContext.save()
+    func fetchInitialData() async throws {
+        try insertDefaultObjects()
 
         try await sut.fetch()
 
@@ -55,43 +46,39 @@ final class JWWFetchedResultsControllerTests {
         #expect(result.count == 3, "Expected 3 people, but got \(result.count)")
     }
 
-    @Test("Updating already fetched data")
-    func updateData() async throws {
+    @Test("Initial fetch doesn't call delegate methods")
+    func initialFetchDoesntCallDelegate() async throws {
         delegate = JWWFetchedResultsControllerTestsDelegate()
         sut.delegate = delegate
-
-        let people = [
-            Person(id: UUID(), firstName: "John"),
-            Person(id: UUID(), firstName: "Jane"),
-            Person(id: UUID(), firstName: "Doe")
-        ]
-
-        for person in people {
-            container.mainContext.insert(person)
-        }
-        try container.mainContext.save()
+        try insertDefaultObjects()
 
         try await sut.fetch()
 
         let result = try #require(delegate)
-        #expect(result.controllerWillChangeContentCalled == true)
-        #expect(result.controllerDidChangeContentCalled == true)
+        #expect(result.controllerWillChangeContentCalled == false, "Delegate methods should not be called after the initial fetch.")
+        #expect(result.controllerDidChangeContentCalled == false, "Delegate methods should not be called after the initial fetch.")
+        #expect(result.controllerDidChangeObjectCalled == false, "Delegate methods should not be called after the initial fetch.")
+    }
+
+    @Test("Updating already fetched data calls delegate methods")
+    func updatingDataCallsDelegateMethods() async throws {
+        delegate = JWWFetchedResultsControllerTestsDelegate()
+        sut.delegate = delegate
+        try insertDefaultObjects()
+        try await sut.fetch()
 
         container.mainContext.insert(Person(id: UUID(), firstName: "Steve"))
         try container.mainContext.save()
+
+        let result = try #require(delegate)
+        #expect(result.controllerWillChangeContentCalled == true, "Delegate methods should be called after data change.")
+        #expect(result.controllerDidChangeContentCalled == true, "Delegate methods should be called after data change.")
+        #expect(result.controllerDidChangeObjectCalled == true, "Delegate methods should be called after data change.")
     }
 
     @Test("object(at:) returns correct object")
     func objectAtIndexPath() async throws {
-        let people = [
-            Person(id: UUID(), firstName: "John"),
-            Person(id: UUID(), firstName: "Jane"),
-            Person(id: UUID(), firstName: "Doe")
-        ]
-        for person in people {
-            container.mainContext.insert(person)
-        }
-        try container.mainContext.save()
+        try insertDefaultObjects()
         try await sut.fetch()
 
         let indexPath = IndexPath(item: 1, section: 0)
@@ -101,15 +88,7 @@ final class JWWFetchedResultsControllerTests {
 
     @Test("indexPath(forObject:) returns correct indexPath")
     func indexPathForObject() async throws {
-        let people = [
-            Person(id: UUID(), firstName: "John"),
-            Person(id: UUID(), firstName: "Jane"),
-            Person(id: UUID(), firstName: "Doe")
-        ]
-        for person in people {
-            container.mainContext.insert(person)
-        }
-        try container.mainContext.save()
+        try insertDefaultObjects()
         try await sut.fetch()
 
         let object = try #require(sut.fetchedModels?.last)
@@ -119,13 +98,7 @@ final class JWWFetchedResultsControllerTests {
 
     @Test("object(at:) throws for out-of-bounds indexPath")
     func objectAtIndexPathOutOfBounds() async throws {
-        let people = [
-            Person(id: UUID(), firstName: "John")
-        ]
-        for person in people {
-            container.mainContext.insert(person)
-        }
-        try container.mainContext.save()
+        try insertDefaultObjects()
         try await sut.fetch()
 
         let indexPath = IndexPath(item: 10, section: 0)
@@ -136,36 +109,54 @@ final class JWWFetchedResultsControllerTests {
 
     @Test("indexPath(forObject:) returns nil for missing object")
     func indexPathForNonexistentObject() async throws {
-        let people = [
-            Person(id: UUID(), firstName: "John")
-        ]
-        for person in people {
-            container.mainContext.insert(person)
-        }
-        try container.mainContext.save()
+        try insertDefaultObjects()
         try await sut.fetch()
 
         let missing = Person(id: UUID(), firstName: "Ghost")
         let indexPath = sut.indexPath(forObject: missing)
         #expect(indexPath == nil)
     }
+
+    // MARK: Private / Convenience
+    // ====================================
+    // Private / Convenience
+    // ====================================
+
+    /// Inserts default test objects into the container.
+    private func insertDefaultObjects() throws {
+        let people: [Person] = [
+            Person(id: UUID(), firstName: "John"),
+            Person(id: UUID(), firstName: "Jane"),
+            Person(id: UUID(), firstName: "Doe")
+        ]
+        for person in people {
+            container.mainContext.insert(person)
+        }
+        try container.mainContext.save()
+    }
 }
 
 @available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
-final class JWWFetchedResultsControllerTestsDelegate: JWWFetchedResultsControllerDelegate {
-    func controllerWillChangeContent(_ controller: JWWSwiftData.JWWFetchedResultsController<some PersistentModel>) {
-        controllerWillChangeContentCalled = true
-    }
-    
-    func controllerDidChangeContent(_ controller: JWWSwiftData.JWWFetchedResultsController<some PersistentModel>) {
-        controllerDidChangeContentCalled = true
-    }
-
+private final class JWWFetchedResultsControllerTestsDelegate: JWWFetchedResultsControllerDelegate {
     private(set) var controllerWillChangeContentCalled: Bool
     private(set) var controllerDidChangeContentCalled: Bool
+    private(set) var controllerDidChangeObjectCalled: Bool
 
     init() {
         self.controllerWillChangeContentCalled = false
         self.controllerDidChangeContentCalled = false
+        self.controllerDidChangeObjectCalled = false
+    }
+
+    func controllerWillChangeContent(_ controller: JWWSwiftData.JWWFetchedResultsController<some PersistentModel>) {
+        controllerWillChangeContentCalled = true
+    }
+
+    func controllerDidChangeContent(_ controller: JWWSwiftData.JWWFetchedResultsController<some PersistentModel>) {
+        controllerDidChangeContentCalled = true
+    }
+
+    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange anObject: some PersistentModel, at indexPath: IndexPath?, for type: JWWFetchedResultsChangeType, newIndexPath: IndexPath?) {
+        controllerDidChangeObjectCalled = true
     }
 }

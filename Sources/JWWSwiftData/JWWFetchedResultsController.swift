@@ -22,12 +22,23 @@ public enum JWWFetchedResultsChangeType: String, CaseIterable, Hashable {
     case deleted
 }
 
+public protocol JWWFetchedResultsSectionInfo {
+    var name: String { get }
+    var indexTitle: String? { get }
+    var numberOfObjects: Int { get }
+    var objects: [Any]? { get }
+}
+
 @available(macOS 15, iOS 18, tvOS 18, watchOS 11, *)
 @MainActor
 public protocol JWWFetchedResultsControllerDelegate: AnyObject {
     func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
 
+    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange sectionInfo: any JWWFetchedResultsSectionInfo, atSectionIndex sectionIndex: Int, for type: JWWFetchedResultsChangeType)
+
     func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange anObject: some PersistentModel, at indexPath: IndexPath?, for type: JWWFetchedResultsChangeType, newIndexPath: IndexPath?)
+
+    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference)
 
     func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>)
 }
@@ -35,7 +46,11 @@ public protocol JWWFetchedResultsControllerDelegate: AnyObject {
 public extension JWWFetchedResultsControllerDelegate {
     func controllerWillChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>) { }
 
+    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange sectionInfo: any JWWFetchedResultsSectionInfo, atSectionIndex sectionIndex: Int, for type: JWWFetchedResultsChangeType) { }
+
     func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChange anObject: some PersistentModel, at indexPath: IndexPath?, for type: JWWFetchedResultsChangeType, newIndexPath: IndexPath?) { }
+
+    func controller(_ controller: JWWFetchedResultsController<some PersistentModel>, didChangeContentWith snapshot: NSDiffableDataSourceSnapshotReference) { }
 
     func controllerDidChangeContent(_ controller: JWWFetchedResultsController<some PersistentModel>) { }
 }
@@ -80,15 +95,7 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
     public func fetch() async throws {
         let results  = try modelContext.fetch(fetchDescriptor)
 
-        if let delegate {
-            delegate.controllerWillChangeContent(self)
-        }
-
         fetchedModels = results
-
-        if let delegate {
-            delegate.controllerDidChangeContent(self)
-        }
 
         notificationsTask = Task { [notificationCenter] in
             await subscribeToModelChanges(notificationCenter: notificationCenter)
@@ -157,25 +164,25 @@ public final class JWWFetchedResultsController<T: PersistentModel> {
             for transaction in transactions {
                 for change in transaction.changes {
                     let modelID = change.changedPersistentIdentifier
-                    let fetchDescriptor = FetchDescriptor<T>(predicate: #Predicate { thing in
-                        thing.persistentModelID == modelID
+                    let fetchDescriptor = FetchDescriptor<T>(predicate: #Predicate { object in
+                        object.persistentModelID == modelID
                     })
                     let fetchResults = try? context.fetch(fetchDescriptor)
-                    guard let matchedThing = fetchResults?.first else {
+                    guard let object = fetchResults?.first else {
                         continue
                     }
 
                     switch change {
                     case .insert(_ as DefaultHistoryInsert<T>):
-                        results.insert(matchedThing)
+                        results.insert(object)
                     case .update(_ as DefaultHistoryUpdate<T>):
-                        results.update(with: matchedThing)
+                        results.update(with: object)
                     case .delete(_ as DefaultHistoryDelete<T>):
-                        results.remove(matchedThing)
-                    default: break
+                        results.remove(object)
+                    default:
+                        break
                     }
                 }
-
             }
 
             Logger.package.debug("Processed results are: \(String(describing: results))")
