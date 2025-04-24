@@ -33,7 +33,7 @@ open class JWWPersistentContainer: NSPersistentContainer, JWWPersistentContainer
     /// - Parameters:
     ///   - name: The name used by the persistent container
     ///   - bundle: The bundle to search for the managed object model.
-    public required init(name: String, bundle: Bundle) {
+    public init(name: String, bundle: Bundle) {
         guard let url = bundle.url(forResource: name, withExtension: "momd") else {
             fatalError("Failed to find model \(name) in bundle.")
         }
@@ -55,28 +55,15 @@ open class JWWPersistentContainer: NSPersistentContainer, JWWPersistentContainer
             })
     }
 
-    // MARK: Subclass Methods
+    // MARK: Loading Persistent Stores
     // ====================================
-    // Subclass Methods
-    // ====================================
-
-    open override func newBackgroundContext() -> NSManagedObjectContext {
-        let context = super.newBackgroundContext()
-        context.undoManager = nil
-        context.name = "Persistent Container Background Context"
-        context.mergePolicy = NSMergePolicy(merge: .mergeByPropertyStoreTrumpMergePolicyType)
-        return context
-    }
-
-    // MARK: Public Methods
-    // ====================================
-    // Public Methods
+    // Loading Persistent Stores
     // ====================================
 
     /// Returns a publisher that wraps the `loadPersistentStores(completionHandler:)` function.
     ///
     /// - Returns: An `AnyPublisher` wrapping this publisher.
-    public func loadPersistentStores() -> AnyPublisher<[NSPersistentStoreDescription], Error> {
+    open func loadPersistentStores() -> AnyPublisher<[NSPersistentStoreDescription], Error> {
         Publishers.MergeMany(persistentStoreDescriptions.map(load(store:)))
             .collect()
             .handleEvents(receiveCompletion: { completion in
@@ -88,6 +75,72 @@ open class JWWPersistentContainer: NSPersistentContainer, JWWPersistentContainer
                 }
             })
             .eraseToAnyPublisher()
+    }
+
+    /// Loads the persistent stores.
+    open func loadPersistentStores() async throws {
+        do {
+            for store in persistentStoreDescriptions {
+                try await load(store: store)
+            }
+
+            await updateState(.loaded)
+        } catch {
+            await updateState(.failed(error))
+
+            throw error
+        }
+    }
+
+    @MainActor
+    private func updateState(_ newState: State) async {
+        self.state = newState
+    }
+
+    /// Load an individual persistent store
+    ///
+    /// - Parameter store: The persistent store to load.
+    /// - Returns: The persistent store description object for the loaded store.
+    @discardableResult
+    open func load(store: NSPersistentStoreDescription) -> AnyPublisher<NSPersistentStoreDescription, Error> {
+        Future { [self] promise in
+            persistentStoreCoordinator.addPersistentStore(with: store) { (_, error) in
+                if let error {
+                    return promise(.failure(error))
+                }
+
+                return promise(.success((store)))
+            }
+        }.eraseToAnyPublisher()
+    }
+
+    /// Load an individual persistent store
+    ///
+    /// - Parameter store: The persistent store to load.
+    /// - Returns: The persistent store description object for the loaded store.
+    open func load(store: NSPersistentStoreDescription) async throws {
+        return try await withCheckedThrowingContinuation({ continuation in
+            persistentStoreCoordinator.addPersistentStore(with: store) { (description, error) in
+                if let error {
+                    return continuation.resume(throwing: error)
+                }
+
+                return continuation.resume(returning: ())
+            }
+        })
+    }
+
+    // MARK: Subclass Methods
+    // ====================================
+    // Subclass Methods
+    // ====================================
+
+    open override func newBackgroundContext() -> NSManagedObjectContext {
+        let context = super.newBackgroundContext()
+        context.undoManager = nil
+        context.name = "Persistent Container Background Context"
+        context.mergePolicy = NSMergePolicy(merge: .mergeByPropertyStoreTrumpMergePolicyType)
+        return context
     }
 
     // MARK: Private / Convenience

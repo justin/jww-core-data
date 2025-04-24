@@ -58,12 +58,6 @@ public protocol JWWPersistentContainerProviding: AnyObject {
     /// The main thread / UI managed object context.
     var mainObjectContext: NSManagedObjectContext { get }
 
-    /// Initializes a persistent container with the given name and model.
-    /// - Parameters:
-    ///   - name: The name used by the persistent container
-    ///   - bundle: The bundle to search for the managed object model.
-    init(name: String, bundle: Bundle)
-
     /// Perform a background task against the loaded persistent container.
     @discardableResult
     func performBackgroundTask(andSave shouldSave: Bool,
