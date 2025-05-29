@@ -57,7 +57,7 @@ final class TestPersistentContainer: NSPersistentContainer, JWWPersistentContain
     }
 
     deinit {
-        reset()
+        try? reset()
         persistentStoreLoadingSubscriber?.cancel()
         persistentStoreLoadingSubscriber = nil
     }

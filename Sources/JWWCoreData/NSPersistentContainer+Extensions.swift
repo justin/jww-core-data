@@ -76,6 +76,9 @@ public protocol JWWPersistentContainerProviding: AnyObject {
     /// Load all persistent stores.
     func loadPersistentStores() async throws -> NSPersistentContainer.State
 
+    /// Unload any persistent stores and truncate the data inside.
+    func reset() throws
+
     /// Load an individual persistent store.
     ///
     /// - Parameter store: The persistent store to load.
@@ -180,18 +183,19 @@ public extension JWWPersistentContainerProviding where Self: NSPersistentContain
         }.eraseToAnyPublisher()
     }
 
-#if DEBUG
-    /// Reset the persistent store to its initial state.
-    ///
-    /// This is only used for testing purposes.
-    package func reset() {
-        do {
-            for store in persistentStoreCoordinator.persistentStores where store.url != nil {
-                try persistentStoreCoordinator.destroyPersistentStore(at: store.url!, type: .sqlite)
-            }
-        } catch let error {
-            fatalError("\(error)")
+
+    // MARK: Unloading / Destorying Persistent Stores
+    // ===============================================
+    // Unloading / Destorying Persistent Stores
+    // ===============================================
+
+    /// Unload any persistent stores and truncate the data inside.
+    func reset() throws {
+        for storeURL in persistentStoreCoordinator.persistentStores.filter({
+            $0.type == NSSQLiteStoreType
+        }).compactMap(\.url) {
+            try persistentStoreCoordinator.destroyPersistentStore(
+                at: storeURL, ofType: NSSQLiteStoreType, options: nil)
         }
     }
-#endif
 }

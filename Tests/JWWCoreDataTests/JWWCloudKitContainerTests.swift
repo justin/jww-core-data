@@ -35,7 +35,7 @@ final class JWWCloudKitContainerTests: XCTestCase {
     override func tearDownWithError() throws {
         try super.tearDownWithError()
 
-        sut.reset()
+        try sut.reset()
         sut = nil
         subscriptions.removeAll()
     }

@@ -17,7 +17,7 @@ final class JWWPersistentContainerProvidingTests: XCTestCase {
     override func tearDownWithError() throws {
         try super.tearDownWithError()
 
-        sut.reset()
+        try sut.reset()
         subscriptions.removeAll()
         sut = nil
     }
