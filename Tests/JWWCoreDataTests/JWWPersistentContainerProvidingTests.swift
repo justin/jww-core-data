@@ -113,7 +113,6 @@ final class JWWPersistentContainerProvidingTests: XCTestCase {
             }
         })
 
-
         let count = try sut.viewContext.count(for: CDPerson.sortedFetchRequest)
         XCTAssertEqual(count, 100)
     }

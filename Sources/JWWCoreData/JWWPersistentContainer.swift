@@ -120,7 +120,7 @@ open class JWWPersistentContainer: NSPersistentContainer, JWWPersistentContainer
     /// - Returns: The persistent store description object for the loaded store.
     open func load(store: NSPersistentStoreDescription) async throws {
         return try await withCheckedThrowingContinuation({ continuation in
-            persistentStoreCoordinator.addPersistentStore(with: store) { (description, error) in
+            persistentStoreCoordinator.addPersistentStore(with: store) { (_, error) in
                 if let error {
                     return continuation.resume(throwing: error)
                 }

@@ -24,7 +24,7 @@ let package = Package(
         .testTarget(name: "JWWCoreDataTests",
                     dependencies: [
                         .target(name: "JWWCoreData"),
-                        .product(name: "JWWCore", package: "jww-standard-lib"),
+                        .product(name: "JWWCore", package: "jww-standard-lib")
                     ],
                     resources: [
                         .process("Resources")
