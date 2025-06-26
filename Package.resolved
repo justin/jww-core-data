@@ -1,16 +1,15 @@
 {
-  "object": {
-    "pins": [
-      {
-        "package": "JWWCore",
-        "repositoryURL": "https://github.com/justin/jww-standard-lib.git",
-        "state": {
-          "branch": null,
-          "revision": "d679860c9dbc284c2531a8ef9ace3f3b49080c73",
-          "version": "1.2.0"
-        }
+  "originHash" : "391dfb97a73733d42985ae98baf317d4770c3ddb2e64ca907100822f918fa695",
+  "pins" : [
+    {
+      "identity" : "jww-standard-lib",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/justin/jww-standard-lib.git",
+      "state" : {
+        "revision" : "fd9862387bdecfd1527c1b9265754b57f1827c73",
+        "version" : "1.3.0"
       }
-    ]
-  },
-  "version": 1
+    }
+  ],
+  "version" : 3
 }
