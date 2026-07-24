@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/justin/jww-standard-lib.git",
       "state" : {
-        "revision" : "fd9862387bdecfd1527c1b9265754b57f1827c73",
-        "version" : "1.3.0"
+        "revision" : "a991db6f1a734ead1f0dfeaf00d01a634b0dd2a1",
+        "version" : "1.4.0"
       }
     }
   ],
