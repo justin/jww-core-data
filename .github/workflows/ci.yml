@@ -28,7 +28,7 @@ jobs:
           - tvOS
           - iOS
         xcode:
-          - ^16
+          - ^26
     steps:
       - name: Checkout
         uses: actions/checkout@v4
